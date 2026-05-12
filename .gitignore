@@ -1,0 +1,4 @@
+.vscode
+config/local.yaml
+cmd/__debug*
+cmd/*.exe*
