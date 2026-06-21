@@ -13,10 +13,24 @@ const KSeasonsNoRank = -1000
 const KSeasonsRankCup = 0
 const KSeasonsRankCupTournament = 250
 
+const KOptionsParent = "PARENT"
 const KOptionsJoin = "JOIN"
-const KOptionsResultsOf = "RESULTSOF"
 const KOptionsMode = "MODE"
+const KOptionsV = "V"
+const KOptionsDrawlimit = "DRAWLIMIT"
+const KOptionsPlusMinus = "+-"
+const KOptionsMinusMinus = "--"
+const KOptionsViewModeSimpleList = "SIMPLELIST"
 const KOptionsViewModeResults = "RESULTS"
+const KOptionsRoot = "ROOT"
+const KOptionsResultsOf = "RESULTSOF"
+const KOptionsNext = "NEXT"
+const KOptionsNextUp = "NEXTUP"
+const KOptionsNextDown = "NEXTDOWN"
+
+const KViewOption_Table = "TABLE"
+const KViewOption_Cup = "CUP"
+const KViewOption_Text = "TEXT"
 
 const (
 	RtScoreNormal     = 0  //  1:0, 0:3
@@ -463,6 +477,7 @@ const Fld_class_season_options_1 = "options_1"
 const Fld_class_season_options_2 = "options_2"
 const Fld_class_season_plain_text = "plain_text"
 const Fld_class_season_group = "season_group"
+const Fld_class_season_remark_text = "remark_text"
 
 const Fld_sport_games_played = "games_played"
 const Fld_sport_wins = "wins"
@@ -578,5 +593,67 @@ type TblTeamMatches struct {
 	TeamID2   int    `json:"TeamID2"`
 	Score     string `json:"Score"`
 	Date      string `json:"Date"`
-	Color     string `json:"Color,omitempty"`
+}
+
+type TournamentMatrixTeam struct {
+	ID    int    `json:"id"`
+	Place int    `json:"place"`
+	Name  string `json:"name"`
+
+	Games        int `json:"games"`
+	Points       int `json:"points"`
+	Wins         int `json:"wins"`
+	OTWins       int `json:"otWins"`
+	OTLosses     int `json:"otLosses"`
+	Losses       int `json:"losses"`
+	GoalsFor     int `json:"goalsFor"`
+	GoalsAgainst int `json:"goalsAgainst"`
+	Diff         int `json:"diff"`
+}
+
+type TournamentMatrixMatch struct {
+	TeamID     int    `json:"teamId"`
+	OpponentID int    `json:"opponentId"`
+	Score      string `json:"score"`
+	Order      int    `json:"order"`
+	Color      string `json:"color"`
+	Tour       int    `json:"tour"`
+	Date       string `json:"date"`
+}
+
+type TournamentMatrix struct {
+	Teams   []TournamentMatrixTeam  `json:"teams"`
+	Matches []TournamentMatrixMatch `json:"matches"`
+}
+
+type TournamentCup struct {
+	TblTeamMatches
+	Stage string `json:"stage"`
+}
+
+type TournamentPlainText struct {
+	PlainText string `json:"plaintext"`
+}
+
+type TournamentInfo struct {
+	IsOk      bool
+	Title     string
+	ViewOpt   string
+	Rank      int
+	ResultsOf int
+}
+
+type SeasonOptions struct {
+	PlusScored       int
+	MinusScored      int
+	MinusMinusScored int
+
+	ViewOption      string
+	ParentSeasonIDs string
+	JoinSeasonIDs   string
+	Mode            string
+
+	DrawLimit int
+	Root      int
+	ResultsOf int
 }

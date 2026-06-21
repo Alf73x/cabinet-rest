@@ -560,6 +560,23 @@ func (s *Storage) GetTeamName(id int, mode int) (string, error) {
 	return result, nil
 }
 
+func GetSportTeamName(team, city string) string {
+	result := strings.TrimSpace(team + " " + city)
+
+	teamLower := strings.ToLower(team)
+
+	if strings.HasPrefix(teamLower, "команда города ") {
+		return team
+	}
+
+	if strings.HasPrefix(teamLower, "команда ") &&
+		strings.Contains(teamLower, "области") {
+		return team
+	}
+
+	return result
+}
+
 func SportScoreAsTxt(resultType, score, missed, scoreP, missedP int) string {
 	scoreText := strconv.Itoa(score) + ":" + strconv.Itoa(missed)
 
@@ -671,7 +688,6 @@ func GetSportScoreColor(mask int, defaultColor string, isDarkSkin bool) string {
 	return defaultColor
 }
 
-/*
 func GetScoresResult(result_type, scored, scored_et, missed, missed_et int) int {
 	result := kDraw
 
@@ -686,9 +702,9 @@ func GetScoresResult(result_type, scored, scored_et, missed, missed_et int) int 
 			result = kLoose
 		} else if result_type == storage.RtScoreMinusMinus {
 			result = kDraw
-		} else if result_type > storage.MissedET {
+		} else if result_type > missed_et {
 			result = kWinET
-		} else if result_type < storage.MissedET {
+		} else if result_type < missed_et {
 			result = kLooseET
 		} else if result_type == storage.RtScoreWL {
 			result = kWin
@@ -699,4 +715,100 @@ func GetScoresResult(result_type, scored, scored_et, missed, missed_et int) int 
 
 	return result
 }
-*/
+
+func StrToIntDef(s string, def int) int {
+	v, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil {
+		return def
+	}
+	return v
+}
+
+func ParseSeasonOptions(options1 string) storage.SeasonOptions {
+	result := storage.SeasonOptions{}
+
+	s := strings.TrimSpace(options1)
+	if s == "" {
+		return result
+	}
+
+	parts := strings.Split(s, ";")
+
+	for _, part := range parts {
+		s := strings.ToUpper(strings.TrimSpace(part))
+
+		if strings.HasPrefix(s, storage.KOptionsPlusMinus+"=") {
+			value := strings.TrimSpace(strings.TrimPrefix(s, storage.KOptionsPlusMinus+"="))
+
+			p := strings.SplitN(value, ":", 2)
+			if len(p) == 2 {
+				result.PlusScored = StrToIntDef(p[0], 0)
+				result.MinusScored = StrToIntDef(p[1], 100)
+			}
+
+		} else if strings.HasPrefix(s, storage.KOptionsMinusMinus+"=") {
+			value := strings.TrimSpace(strings.TrimPrefix(s, storage.KOptionsMinusMinus+"="))
+			result.MinusMinusScored = StrToIntDef(value, 0)
+
+		} else if strings.HasPrefix(s, storage.KOptionsV+"=") {
+			result.ViewOption =
+				strings.TrimSpace(strings.TrimPrefix(s, storage.KOptionsV+"="))
+
+		} else if strings.HasPrefix(s, storage.KOptionsParent+"=") {
+			result.ParentSeasonIDs =
+				strings.TrimSpace(strings.TrimPrefix(s, storage.KOptionsParent+"="))
+
+		} else if strings.HasPrefix(s, storage.KOptionsJoin+"=") {
+			result.JoinSeasonIDs =
+				strings.TrimSpace(strings.TrimPrefix(s, storage.KOptionsJoin+"="))
+
+		} else if strings.HasPrefix(s, storage.KOptionsDrawlimit+"=") {
+			value := strings.TrimSpace(strings.TrimPrefix(s, storage.KOptionsDrawlimit+"="))
+			result.DrawLimit = StrToIntDef(value, 0)
+
+		} else if strings.HasPrefix(s, storage.KOptionsMode+"=") {
+			result.Mode =
+				strings.TrimSpace(strings.TrimPrefix(s, storage.KOptionsMode+"="))
+
+		} else if strings.HasPrefix(s, storage.KOptionsRoot+"=") {
+			value := strings.TrimSpace(strings.TrimPrefix(s, storage.KOptionsRoot+"="))
+			result.Root = StrToIntDef(value, -1)
+
+		} else if strings.HasPrefix(s, storage.KOptionsResultsOf+"=") {
+			value := strings.TrimSpace(strings.TrimPrefix(s, storage.KOptionsResultsOf+"="))
+			result.ResultsOf = StrToIntDef(value, -1)
+		}
+	}
+
+	return result
+}
+
+func parseViewOption(options string) string {
+	options = strings.TrimSpace(options)
+	if options == "" {
+		return ""
+	}
+	parts := strings.Split(options, ";")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, storage.KOptionsV+"=") {
+			return strings.ToUpper(strings.TrimSpace(strings.TrimPrefix(part, storage.KOptionsV+"=")))
+		}
+	}
+	return ""
+}
+
+func SportDateToText(src string) string {
+	switch len(src) {
+	case 8:
+		return src[0:4] + "." + src[4:6] + "." + src[6:8]
+
+	case 6:
+		return src[0:4] + "." + src[4:6]
+
+	case 4:
+		return src[0:4]
+	}
+
+	return ""
+}

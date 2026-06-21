@@ -2,3 +2,4 @@
 config/local.yaml
 cmd/__debug*
 cmd/*.exe*
+cmd/server/*.exe*

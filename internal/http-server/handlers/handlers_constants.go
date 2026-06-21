@@ -18,3 +18,6 @@ const Url_Teams_ID_Territory = "territory_id" // "/api/v1/teams?territory_id=542
 const Url_Team_Matches = "/api/v1/team_matches" // "/api/v1/team_matches?team_id=77&season_id=1251"
 const Url_Team_Matches_ID_Team = "team_id"
 const Url_Team_Matches_ID_Season = "season_id"
+
+const Url_Tournament = "/api/v1/tournament" // "/api/v1/tournament?id=2626"
+const Url_Tournament_ID = "id"

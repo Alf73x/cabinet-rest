@@ -546,12 +546,331 @@ func (s *Storage) Db_GetTeamMatches(idTeam int, idSeason int) ([]storage.TblTeam
 		}
 		match.Date = date
 		match.Score = SportScoreAsTxt(result_type, scored, missed, scored_et, missed_et)
-		/*
-			mask := GetScoresResult(q2)
-			match.Color = GetSportScoreColor(mask, "", false)
-		*/
+
 		teamMatches = append(teamMatches, match)
 	}
 
 	return teamMatches, nil
+}
+
+/*********************************************************************
+DB_GetSeasonVariables
+**********************************************************************/
+
+func (s *Storage) DB_GetSeasonVariables(id int) (ti storage.TournamentInfo, e error) {
+	var info storage.TournamentInfo
+	info.IsOk = false
+
+	sSQL := `
+	SELECT
+		s.` + storage.Fld_common_name + ` AS nm,
+		IFNULL(s.` + storage.Fld_common_group_id + `, 0),
+		IFNULL(s.` + storage.Fld_class_season_season + `, ''),
+		IFNULL(s.` + storage.Fld_class_season_options_1 + `, ''),
+		IFNULL(s.` + storage.Fld_class_season_league_rank + `, 0),
+		IFNULL(b.` + storage.Fld_common_name + `, '') AS vs,
+		IFNULL(s.` + storage.Fld_class_season_plain_text + `, ''),
+		IFNULL(s.` + storage.Fld_class_season_remark_text + `, ''),
+		IFNULL(s.` + storage.Fld_common_prefix + `, '')
+	FROM ` + storage.Tbl_class_season + ` s
+	LEFT JOIN ` + storage.Tbl_class_base + ` b
+	ON s.` + storage.Fld_common_id_base + ` = b.` + storage.Fld_common_id + `
+	WHERE s.` + storage.Fld_common_id + ` = ?`
+
+	var (
+		name       sql.NullString
+		groupID    sql.NullInt64
+		season     sql.NullString
+		options1   sql.NullString
+		leagueRank sql.NullInt64
+		baseName   sql.NullString
+		plainText  sql.NullString
+		remark     sql.NullString
+		prefix     sql.NullString
+	)
+
+	err := s.db.QueryRow(sSQL, id).Scan(
+		&name,
+		&groupID,
+		&season,
+		&options1,
+		&leagueRank,
+		&baseName,
+		&plainText,
+		&remark,
+		&prefix,
+	)
+	if err != nil {
+		return info, err
+	}
+
+	titlePrefix := ""
+	if strings.TrimSpace(prefix.String) != "" {
+		titlePrefix = prefix.String + ". "
+	}
+
+	info.Title = baseName.String + ". " + titlePrefix + name.String + ". " + season.String
+	info.ViewOpt = parseViewOption(options1.String)
+	info.Rank = int(leagueRank.Int64)
+	info.IsOk = true
+	return info, err
+}
+
+/*
+********************************************************************
+
+	ShowData_Table
+
+*********************************************************************
+*/
+func (s *Storage) ShowData_Table(idSeason int) ([]storage.TournamentMatrix, error) {
+	const fn = "storage.sqlite.ShowData_Table"
+
+	teams, err := s.loadTournamentMatrixTeams(idSeason)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", fn, err)
+	}
+
+	if len(teams) == 0 {
+		return []storage.TournamentMatrix{}, nil
+	}
+
+	matches, err := s.loadTournamentMatrixMatches(idSeason)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", fn, err)
+	}
+
+	result := []storage.TournamentMatrix{
+		{
+			Teams:   teams,
+			Matches: matches,
+		},
+	}
+
+	return result, nil
+}
+
+func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentMatrixTeam, error) {
+	sqlText := `
+		SELECT
+			IFNULL(t.` + storage.Fld_common_id_team + `, 0),
+			IFNULL(t.` + storage.Fld_common_sport_place + `, 0),
+			IFNULL(ct.` + storage.Fld_common_name + `, ''),
+			IFNULL(cou.` + storage.Fld_common_name + `, ''),
+
+			IFNULL(t.` + storage.Fld_sport_games_played + `, 0),
+			IFNULL(t.` + storage.Fld_sport_points + `, 0),
+			IFNULL(t.` + storage.Fld_sport_points_adjustment + `, 0),
+			IFNULL(t.` + storage.Fld_sport_wins + `, 0),
+			IFNULL(t.` + storage.Fld_sport_wins_et + `, 0),
+			IFNULL(t.` + storage.Fld_sport_losses_et + `, 0),
+			IFNULL(t.` + storage.Fld_sport_losses + `, 0),
+			IFNULL(t.` + storage.Fld_sport_goals_for + `, 0),
+			IFNULL(t.` + storage.Fld_sport_goals_against + `, 0)
+		FROM ` + storage.Tbl_sport_tables + ` t
+		LEFT JOIN ` + storage.Tbl_class_team + ` ct
+			ON ct.` + storage.Fld_common_id + ` = t.` + storage.Fld_common_id_team + `
+		LEFT JOIN ` + storage.Tbl_countries + ` cou
+			ON cou.` + storage.Fld_common_id + ` = ct.` + storage.Fld_common_id_country + `
+		WHERE t.` + storage.Fld_common_id_season + ` = ?
+		ORDER BY t.` + storage.Fld_common_sport_place
+
+	rows, err := s.db.Query(sqlText, idSeason)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []storage.TournamentMatrixTeam
+
+	for rows.Next() {
+		var (
+			teamID    int
+			place     int
+			teamName  string
+			cityName  string
+			games     int
+			points    int
+			pointsAdj int
+			wins      int
+			otWins    int
+			otLosses  int
+			losses    int
+			goalsFor  int
+			goalsAg   int
+		)
+
+		err := rows.Scan(
+			&teamID,
+			&place,
+			&teamName,
+			&cityName,
+			&games,
+			&points,
+			&pointsAdj,
+			&wins,
+			&otWins,
+			&otLosses,
+			&losses,
+			&goalsFor,
+			&goalsAg,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		teams = append(teams, storage.TournamentMatrixTeam{
+			ID:           teamID,
+			Place:        place,
+			Name:         GetSportTeamName(teamName, cityName),
+			Games:        games,
+			Points:       points + pointsAdj,
+			Wins:         wins,
+			OTWins:       otWins,
+			OTLosses:     otLosses,
+			Losses:       losses,
+			GoalsFor:     goalsFor,
+			GoalsAgainst: goalsAg,
+			Diff:         goalsFor - goalsAg,
+		})
+	}
+
+	return teams, rows.Err()
+}
+
+func (s *Storage) loadTournamentMatrixMatches(idSeason int) ([]storage.TournamentMatrixMatch, error) {
+	sqlText := `SELECT
+			IFNULL(` + storage.Fld_common_id_team_1 + `, 0),
+			IFNULL(` + storage.Fld_common_id_team_2 + `, 0),
+			IFNULL(` + storage.Fld_sport_result_type + `, 0),
+			IFNULL(` + storage.Fld_sport_scored + `, 0),
+			IFNULL(` + storage.Fld_sport_missed + `, 0),
+			IFNULL(` + storage.Fld_sport_scored_et + `, 0),
+			IFNULL(` + storage.Fld_sport_missed_et + `, 0),
+			IFNULL(` + storage.Fld_sport_tour + `, 0),
+			IFNULL(` + storage.Fld_common_date + `, '')
+		FROM ` + storage.Tbl_sport_results + `
+		WHERE ` + storage.Fld_common_id_season + ` = ?
+		ORDER BY ` + storage.Fld_common_id_team_1 + `,
+				` + storage.Fld_common_id_team_2 + `,
+				` + storage.Fld_common_date
+
+	rows, err := s.db.Query(sqlText, idSeason)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var matches []storage.TournamentMatrixMatch
+
+	orderMap := map[string]int{}
+
+	for rows.Next() {
+		var (
+			teamID1    int
+			teamID2    int
+			resultType int
+			scored     int
+			missed     int
+			scoredET   int
+			missedET   int
+			tour       int
+			date       string
+		)
+
+		err := rows.Scan(
+			&teamID1,
+			&teamID2,
+			&resultType,
+			&scored,
+			&missed,
+			&scoredET,
+			&missedET,
+			&tour,
+			&date,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		key := fmt.Sprintf("%d:%d", teamID1, teamID2)
+		orderMap[key]++
+
+		mask := GetScoresResult(resultType, scored, scoredET, missed, missedET)
+		score := SportScoreAsTxt(resultType, scored, missed, scoredET, missedET)
+
+		matches = append(matches, storage.TournamentMatrixMatch{
+			TeamID:     teamID1,
+			OpponentID: teamID2,
+			Score:      score,
+			Color:      GetSportScoreColor(mask, "", false),
+			Order:      orderMap[key],
+			Tour:       tour,
+			Date:       SportDateToText(date),
+		})
+	}
+
+	return matches, rows.Err()
+}
+
+/*
+********************************************************************
+ShowData_Cup
+*********************************************************************
+*/
+func (s *Storage) ShowData_Cup(ids int) ([]storage.TournamentCup, error) {
+	const _FunctionName = "storage.sqlite.ShowData_Cup"
+
+	cup := []storage.TournamentCup{
+		{
+			TblTeamMatches: storage.TblTeamMatches{
+				TeamName1: "Спартак Москва",
+				TeamID1:   1,
+				TeamName2: "Зенит Санкт-Петербург",
+				TeamID2:   2,
+				Score:     "2:1",
+				Date:      "20260515",
+			},
+			Stage: "Финал",
+		},
+		{
+			TblTeamMatches: storage.TblTeamMatches{
+				TeamName1: "ЦСКА Москва",
+				TeamID1:   3,
+				TeamName2: "Динамо Москва",
+				TeamID2:   4,
+				Score:     "1:0",
+				Date:      "20260510",
+			},
+			Stage: "1/2 финала",
+		},
+	}
+
+	return cup, nil
+}
+
+/*
+********************************************************************
+
+	ShowDataPlain
+
+*********************************************************************
+*/
+func (s *Storage) ShowDataPlain(ids int) ([]storage.TournamentPlainText, error) {
+	const _FunctionName = "storage.sqlite.ShowDataPlain"
+
+	plain := []storage.TournamentPlainText{
+		{
+			PlainText: `2025-2026 — Вторая лига "Дивизион А".
+
+Первый этап. Группа "Золото".
+
+Команды проводят двухкруговой турнир.
+За победу начисляется 3 очка,
+за ничью — 1 очко,
+за поражение — 0 очков.`,
+		},
+	}
+
+	return plain, nil
 }
