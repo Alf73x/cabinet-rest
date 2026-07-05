@@ -586,13 +586,26 @@ type TblTeams struct {
 	Options  string
 }
 
+type TblTeam struct {
+	ID         int
+	Name       string
+	SeasonID   int
+	Season     string
+	SeasonName string
+	LeagueRank string
+	Place      string
+	StageIndex int
+	Result     string
+	Stat
+}
+
 type TblTeamMatches struct {
-	TeamName1 string `json:"TeamName1"`
-	TeamID1   int    `json:"TeamID1"`
-	TeamName2 string `json:"TeamName2"`
-	TeamID2   int    `json:"TeamID2"`
-	Score     string `json:"Score"`
-	Date      string `json:"Date"`
+	TeamName1 string `json:"teamName1"`
+	TeamID1   int    `json:"teamId1"`
+	TeamName2 string `json:"teamName2"`
+	TeamID2   int    `json:"teamId2"`
+	Score     string `json:"score"`
+	Date      string `json:"date"`
 }
 
 type TournamentMatrixTeam struct {
@@ -628,11 +641,12 @@ type TournamentMatrix struct {
 
 type TournamentCup struct {
 	TblTeamMatches
-	Stage string `json:"stage"`
+	StageIndex int `json:"stageIndex"`
+	SortOrder  int `json:"-"`
 }
 
 type TournamentPlainText struct {
-	PlainText string `json:"plaintext"`
+	PlainText string `json:"plainText"`
 }
 
 type TournamentInfo struct {

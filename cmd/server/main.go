@@ -121,6 +121,13 @@ func main() {
 		r.Get("/", handlers.NewTournament(log, storage))
 	})
 
+	router.Route(handlers.Url_Team, func(r chi.Router) {
+		r.Use(middleware.BasicAuth("CabinetREST", map[string]string{
+			cfg.HTTPServer.User: cfg.HTTPServer.Password,
+		}))
+		r.Get("/", handlers.NewTeam(log, storage))
+	})
+
 	// run server
 	log.Info("starting server", slog.String("address", cfg.Address))
 

@@ -21,3 +21,6 @@ const Url_Team_Matches_ID_Season = "season_id"
 
 const Url_Tournament = "/api/v1/tournament" // "/api/v1/tournament?id=2626"
 const Url_Tournament_ID = "id"
+
+const Url_Team = "/api/v1/team" // "/api/v1/team?id=2626"
+const Url_Team_ID = "id"

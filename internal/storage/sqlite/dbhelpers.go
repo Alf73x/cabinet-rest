@@ -530,36 +530,6 @@ func Sport_IsTable(idx int) bool {
 		idx == storage.KRank_Tournament
 }
 
-func (s *Storage) GetTeamName(id int, mode int) (string, error) {
-	result := ""
-	str := "SELECT " +
-		"IFNULL(t." + storage.Fld_common_name + ",'') tm, " +
-		"IFNULL(c." + storage.Fld_common_name + ",'') cn " +
-		"FROM " + storage.Tbl_class_team + " t " +
-		"LEFT JOIN " + storage.Tbl_countries + " c ON t." +
-		storage.Fld_common_id_country + "=c." + storage.Fld_common_id + " " +
-		"WHERE t." + storage.Fld_common_id + "=" + strconv.Itoa(id)
-	row := s.db.QueryRow(str)
-	var teamName string
-	var countryName string
-	err := row.Scan(&teamName, &countryName)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return "", nil
-		}
-		return "", err
-	}
-	switch mode {
-	case 0:
-		result = teamName + " " + countryName
-	case 1:
-		result = teamName
-	case 2:
-		result = countryName
-	}
-	return result, nil
-}
-
 func GetSportTeamName(team, city string) string {
 	result := strings.TrimSpace(team + " " + city)
 
@@ -783,19 +753,37 @@ func ParseSeasonOptions(options1 string) storage.SeasonOptions {
 	return result
 }
 
-func parseViewOption(options string) string {
+func parseViewOption(options string) (view string, resultsOf int) {
+	resultsOf = -1
+
 	options = strings.TrimSpace(options)
 	if options == "" {
-		return ""
+		return
 	}
+
 	parts := strings.Split(options, ";")
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
-		if strings.HasPrefix(part, storage.KOptionsV+"=") {
-			return strings.ToUpper(strings.TrimSpace(strings.TrimPrefix(part, storage.KOptionsV+"=")))
+
+		switch {
+		case strings.HasPrefix(part, storage.KOptionsV+"="):
+			view = strings.ToUpper(
+				strings.TrimSpace(
+					strings.TrimPrefix(part, storage.KOptionsV+"="),
+				),
+			)
+
+		case strings.HasPrefix(strings.ToUpper(part), strings.ToUpper(storage.KOptionsResultsOf+"=")):
+			s := strings.TrimSpace(
+				part[len(storage.KOptionsResultsOf)+1:],
+			)
+			if n, err := strconv.Atoi(s); err == nil {
+				resultsOf = n
+			}
 		}
 	}
-	return ""
+
+	return
 }
 
 func SportDateToText(src string) string {
@@ -811,4 +799,165 @@ func SportDateToText(src string) string {
 	}
 
 	return ""
+}
+
+func SportGetStageValue(aiStage int, aiBase ...int) int {
+	result := 0
+
+	switch aiStage {
+	case 0:
+		result = 0 // Минимум
+
+	case 1:
+		result = 250 // Финал (максимум)
+	case 2:
+		result = 220 // 1/2 финала
+	case 3:
+		result = 180 // 1/4 финала
+	case 4:
+		result = 150 // 1/8 финала
+	case 5:
+		result = 120 // 1/16 финала
+	case 6:
+		result = 90 // 1/32 финала
+	case 7:
+		result = 60 // 1/64 финала
+	case 8:
+		result = 40 // 1/128 финала
+	case 9:
+		result = 20 // 1/256 финала
+	case 10:
+		result = 10 // 1/512 финала
+	case 11:
+		result = 5 // 1/1024 финала
+
+	case 50:
+		result = 140 // Матчи за 5–8 место
+	case 51:
+		result = 145 // Матч за 7 место
+	case 52:
+		result = 147 // Матч за 5 место
+	case 53:
+		result = 210 // Матч за 3 место
+	case 54:
+		result = 210 // 3-е место
+	case 57:
+		result = 215 // 2-е место
+	case 65:
+		result = 250 // 1-е место
+
+	case 66:
+		result = 138 // 9-е место
+	case 67:
+		result = 136 // 11-е место
+	case 68:
+		result = 134 // 13-е место
+	case 69:
+		result = 132 // 15-е место
+	case 85:
+		result = 131 // 16-е место
+	case 70:
+		result = 130 // 17-е место
+	case 71:
+		result = 128 // 19-е место
+	case 72:
+		result = 126 // 21-е место
+	case 73:
+		result = 124 // 23-е место
+	case 74:
+		result = 122 // 25-е место
+	case 75:
+		result = 120 // 27-е место
+	case 76:
+		result = 118 // 29-е место
+	case 77:
+		result = 116 // 31-е место
+	case 78:
+		result = 114 // 33-е место
+	case 79:
+		result = 112 // 35-е место
+	case 80:
+		result = 110 // 37-е место
+	case 81:
+		result = 108 // 39-е место
+
+	case 180:
+		result = 10 // Путь регионов. 1-й раунд
+	case 181:
+		result = 20 // Путь регионов. 2-й раунд
+	case 182:
+		result = 40 // Путь регионов. 3-й раунд
+	case 183:
+		result = 60 // Путь регионов. 4-й раунд
+	case 184:
+		result = 90 // Путь регионов. 5-й раунд
+	case 185:
+		result = 120 // Путь регионов. 6-й раунд
+
+	case 210, 211, 212, 213:
+		result = 120 // Путь РПЛ. Группы A–D
+	case 214:
+		result = 150 // Путь РПЛ. 1/4 финала
+	case 215:
+		result = 180 // Путь РПЛ. 1/2 финала
+	case 218:
+		result = 220 // Путь РПЛ. Финал
+
+	case 225:
+		result = 90 // Путь регионов. 1/4 финала. 1-й этап
+	case 226:
+		result = 120 // Путь регионов. 1/4 финала. 2-й этап
+	case 227:
+		result = 150 // Путь регионов. 1/2 финала. 1-й этап
+	case 228:
+		result = 180 // Путь регионов. 1/2 финала. 2-й этап
+	case 229:
+		result = 220 // Путь регионов. Финал
+
+	case 390:
+		result = 180 // Этап победителей
+
+	case 3699:
+		result = 91 // Финал + 1
+
+	default:
+		switch {
+		case aiStage >= 150 && aiStage <= 175:
+			result = 140 // Элитный групповой раунд
+
+		case aiStage >= 320 && aiStage <= 327:
+			result = 120 // Группа A–H
+
+		case aiStage >= 361 && aiStage <= 370:
+			result = 120 // Группа 1–10
+
+		case aiStage >= 400 && aiStage <= 3695:
+			// Зональные соревнования
+			switch aiStage % 10 {
+			case 1:
+				result = 90 // Финал
+			case 2:
+				result = 60 // 1/2 финала
+			case 3:
+				result = 40 // 1/4 финала
+			case 4:
+				result = 20 // 1/8 финала
+			case 5:
+				result = 10 // 1/16 финала
+			case 6:
+				result = 5 // 1/32 финала
+			case 7:
+				result = 4 // 1/64 финала
+			case 8:
+				result = 3 // 1/128 финала
+			case 9:
+				result = 2 // 1/256 финала
+			}
+
+		case aiStage >= 3696 && aiStage <= 3698:
+			result = 1 // 1/512 зональных соревнований
+		}
+	}
+
+	return result
 }

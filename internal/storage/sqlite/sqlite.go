@@ -4,6 +4,7 @@ import (
 	"CabinetREST/internal/storage"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -80,7 +81,6 @@ func (s *Storage) Db_GetTerritories(parentID int) ([]storage.TblCountry, error) 
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
 	}
-
 	defer rows.Close()
 
 	var countries []storage.TblCountry
@@ -124,7 +124,6 @@ func (s *Storage) Db_SearchTerritories(filter string) ([]storage.TblCountry, err
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
 	}
-
 	defer rows.Close()
 
 	var countries []storage.TblCountry
@@ -178,7 +177,6 @@ func (s *Storage) Db_PathTerritories(id int) ([]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
 	}
-
 	defer rows.Close()
 
 	var path []int
@@ -231,7 +229,6 @@ func (s *Storage) Db_GetSeasons(idssport string, filterSeason string, filterName
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
 	}
-
 	defer rows.Close()
 
 	var seasons []storage.TblSeason
@@ -344,8 +341,8 @@ func (s *Storage) Db_GetTeams(idTerritory int, idssport string) ([]storage.TblTe
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
 	}
-
 	defer rows.Close()
+
 	var teams []storage.TblTeams
 	for rows.Next() {
 		var team storage.TblTeams
@@ -389,6 +386,36 @@ func (s *Storage) Db_GetTeams(idTerritory int, idssport string) ([]storage.TblTe
 	return teams, nil
 }
 
+func (s *Storage) DB_GetTeamName(id int, mode int) (string, error) {
+	result := ""
+	str := "SELECT " +
+		"IFNULL(t." + storage.Fld_common_name + ",'') tm, " +
+		"IFNULL(c." + storage.Fld_common_name + ",'') cn " +
+		"FROM " + storage.Tbl_class_team + " t " +
+		"LEFT JOIN " + storage.Tbl_countries + " c ON t." +
+		storage.Fld_common_id_country + "=c." + storage.Fld_common_id + " " +
+		"WHERE t." + storage.Fld_common_id + "=" + strconv.Itoa(id)
+	row := s.db.QueryRow(str)
+	var teamName string
+	var countryName string
+	err := row.Scan(&teamName, &countryName)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	switch mode {
+	case 0:
+		result = teamName + " " + countryName
+	case 1:
+		result = teamName
+	case 2:
+		result = countryName
+	}
+	return result, nil
+}
+
 /*********************************************************************
   Db_GetTeamMatches
 **********************************************************************/
@@ -398,9 +425,7 @@ func (s *Storage) Db_GetTeamMatches(idTeam int, idSeason int) ([]storage.TblTeam
 	var teamMatches []storage.TblTeamMatches
 
 	sl, err := s.GetTeamTreeIDs(idTeam)
-
 	var sIDs string
-
 	for i := 0; i < len(sl); i++ {
 		if sIDs != "" {
 			sIDs += ","
@@ -535,12 +560,12 @@ func (s *Storage) Db_GetTeamMatches(idTeam int, idSeason int) ([]storage.TblTeam
 			return nil, err
 		}
 		match.TeamID1 = id_team_1
-		match.TeamName1, err = s.GetTeamName(id_team_1, 0)
+		match.TeamName1, err = s.DB_GetTeamName(id_team_1, 0)
 		if err != nil {
 			return nil, err
 		}
 		match.TeamID2 = id_team_2
-		match.TeamName2, err = s.GetTeamName(id_team_2, 0)
+		match.TeamName2, err = s.DB_GetTeamName(id_team_2, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -610,7 +635,7 @@ func (s *Storage) DB_GetSeasonVariables(id int) (ti storage.TournamentInfo, e er
 	}
 
 	info.Title = baseName.String + ". " + titlePrefix + name.String + ". " + season.String
-	info.ViewOpt = parseViewOption(options1.String)
+	info.ViewOpt, info.ResultsOf = parseViewOption(options1.String)
 	info.Rank = int(leagueRank.Int64)
 	info.IsOk = true
 	return info, err
@@ -821,31 +846,103 @@ ShowData_Cup
 func (s *Storage) ShowData_Cup(ids int) ([]storage.TournamentCup, error) {
 	const _FunctionName = "storage.sqlite.ShowData_Cup"
 
-	cup := []storage.TournamentCup{
-		{
-			TblTeamMatches: storage.TblTeamMatches{
-				TeamName1: "Спартак Москва",
-				TeamID1:   1,
-				TeamName2: "Зенит Санкт-Петербург",
-				TeamID2:   2,
-				Score:     "2:1",
-				Date:      "20260515",
-			},
-			Stage: "Финал",
-		},
-		{
-			TblTeamMatches: storage.TblTeamMatches{
-				TeamName1: "ЦСКА Москва",
-				TeamID1:   3,
-				TeamName2: "Динамо Москва",
-				TeamID2:   4,
-				Score:     "1:0",
-				Date:      "20260510",
-			},
-			Stage: "1/2 финала",
-		},
+	// Get cup winner
+	idCupWinner := -1
+
+	sSQL := "SELECT " + storage.Fld_common_winner_id
+	sSQL += " FROM " + storage.Tbl_class_season
+	sSQL += " WHERE " + storage.Fld_common_id + "=?"
+	err := s.db.QueryRow(sSQL, ids).Scan(&idCupWinner)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
 	}
 
+	// Get matches
+	sSQL = "SELECT "
+	sSQL += "ct1." + storage.Fld_common_id + " AS tid1, "
+	sSQL += "ct2." + storage.Fld_common_id + " AS tid2, "
+	sSQL += "IFNULL(ct1." + storage.Fld_common_name + ", '') AS tname1, "
+	sSQL += "IFNULL(cou1." + storage.Fld_common_name + ", '') AS tcity1, "
+	sSQL += "IFNULL(ct2." + storage.Fld_common_name + ", '') AS tname2, "
+	sSQL += "IFNULL(cou2." + storage.Fld_common_name + ", '') AS tcity2, "
+
+	sSQL += "IFNULL(r." + storage.Fld_sport_scored + ",0), "
+	sSQL += "IFNULL(r." + storage.Fld_sport_scored_et + ",0), "
+	sSQL += "IFNULL(r." + storage.Fld_sport_missed + ",0), "
+	sSQL += "IFNULL(r." + storage.Fld_sport_missed_et + ",0), "
+	sSQL += "IFNULL(r." + storage.Fld_sport_result_type + ",0), "
+	sSQL += "IFNULL(r." + storage.Fld_sport_stage_index + ",0), "
+	sSQL += "IFNULL(r." + storage.Fld_common_date + ",0) "
+
+	//sSQL += "IFNULL(bs." + storage.Fld_common_id + ", 0) AS bas, "
+	// sSQL += "IFNULL(ct1." + storage.Fld_common_favorite + ", 0) AS fv1, "
+	// sSQL += "IFNULL(ct2." + storage.Fld_common_favorite + ", 0) AS fv2 "
+	sSQL += "FROM " + storage.Tbl_sport_results + " r "
+	sSQL += "LEFT JOIN " + storage.Tbl_class_team + " ct1 ON ct1." + storage.Fld_common_id + "=r." + storage.Fld_common_id_team_1 + " "
+	sSQL += "LEFT JOIN " + storage.Tbl_countries + " cou1 ON cou1." + storage.Fld_common_id + "=ct1." + storage.Fld_common_id_country + " "
+	sSQL += "LEFT JOIN " + storage.Tbl_class_team + " ct2 ON ct2." + storage.Fld_common_id + "=r." + storage.Fld_common_id_team_2 + " "
+	sSQL += "LEFT JOIN " + storage.Tbl_countries + " cou2 ON cou2." + storage.Fld_common_id + "=ct2." + storage.Fld_common_id_country + " "
+	sSQL += "LEFT JOIN " + storage.Tbl_class_season + " seas ON seas." + storage.Fld_common_id + "=r." + storage.Fld_common_id_season + " "
+	//sSQL += "LEFT JOIN " + storage.Tbl_class_base + " bs ON bs." + storage.Fld_common_id + "=seas." + storage.Fld_common_id_base + " "
+	sSQL += "WHERE r." + storage.Fld_common_id_season + "=?"
+	rows, err := s.db.Query(sSQL, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, nil
+	}
+
+	cup := []storage.TournamentCup{}
+
+	for rows.Next() {
+		var match storage.TournamentCup
+
+		var (
+			team1       string
+			city1       string
+			team2       string
+			city2       string
+			scored      int
+			scored_et   int
+			missed      int
+			missed_et   int
+			result_type int
+			stage_index int
+			date        string
+		)
+		err := rows.Scan(
+			&match.TeamID1,
+			&match.TeamID2,
+			&team1,
+			&city1,
+			&team2,
+			&city2,
+			&scored,
+			&scored_et,
+			&missed,
+			&missed_et,
+			&result_type,
+			&stage_index,
+			&date,
+		)
+		if err != nil {
+			return nil, err
+		}
+		match.TeamName1 = GetSportTeamName(team1, city1)
+		match.TeamName2 = GetSportTeamName(team2, city2)
+		match.Score = SportScoreAsTxt(result_type, scored, missed, scored_et, missed_et)
+		match.Date = date
+		match.StageIndex = stage_index
+		match.SortOrder = SportGetStageValue(1) - SportGetStageValue(stage_index)
+
+		cup = append(cup, match)
+	}
+
+	sort.Slice(cup, func(i, j int) bool {
+		return cup[i].SortOrder < cup[j].SortOrder
+	})
 	return cup, nil
 }
 
@@ -859,18 +956,105 @@ func (s *Storage) ShowData_Cup(ids int) ([]storage.TournamentCup, error) {
 func (s *Storage) ShowDataPlain(ids int) ([]storage.TournamentPlainText, error) {
 	const _FunctionName = "storage.sqlite.ShowDataPlain"
 
-	plain := []storage.TournamentPlainText{
-		{
-			PlainText: `2025-2026 — Вторая лига "Дивизион А".
-
-Первый этап. Группа "Золото".
-
-Команды проводят двухкруговой турнир.
-За победу начисляется 3 очка,
-за ничью — 1 очко,
-за поражение — 0 очков.`,
-		},
+	sSQL := " SELECT "
+	sSQL = sSQL + " IFNULL(" + storage.Fld_common_text + ", '')"
+	sSQL = sSQL + " FROM " + storage.Tbl_class_season
+	sSQL = sSQL + " WHERE " + storage.Fld_common_id + "=?"
+	var txt string
+	err := s.db.QueryRow(sSQL, ids).Scan(&txt)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
 	}
 
+	plain := []storage.TournamentPlainText{{PlainText: txt}}
 	return plain, nil
+}
+
+/*********************************************************************
+  Db_GetTeam
+**********************************************************************/
+
+func (s *Storage) Db_GetTeam(id int) ([]storage.TblTeam, error) {
+	const _FunctionName = "storage.sqlite.Db_GetTeam"
+
+	sl, err := s.GetTeamTreeIDs(id)
+	var sIDs string
+	for i := 0; i < len(sl); i++ {
+		if sIDs != "" {
+			sIDs += ","
+		}
+		sIDs += strconv.Itoa(sl[i])
+	}
+
+	sSQL := " SELECT "
+	sSQL = sSQL + " IFNULL(tm." + storage.Fld_common_id + ", 0) teamid, "
+	sSQL = sSQL + " IFNULL(tm." + storage.Fld_common_name + ", '') team, "
+	sSQL = sSQL + " IFNULL(c." + storage.Fld_common_name + ", '') ctr, "
+	sSQL = sSQL + " IFNULL(s." + storage.Fld_common_id + ", '') seasonid, "
+	sSQL = sSQL + " IFNULL(s." + storage.Fld_class_season_season + ", '') season, "
+	sSQL = sSQL + " IFNULL(s." + storage.Fld_common_name + ", '') seas, "
+	sSQL = sSQL + " IFNULL(s." + storage.Fld_class_season_league_rank + ", 0), "
+	sSQL = sSQL + " IFNULL(t." + storage.Fld_common_sport_place + ", 0), "
+	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_stage_index + ", 0), "
+	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_wins + ", 0), "
+	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_wins_et + ", 0), "
+	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_draws + ", 0), "
+	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_losses_et + ", 0), "
+	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_losses + ", 0), "
+	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_goals_for + ", 0), "
+	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_goals_against + ", 0) "
+	sSQL = sSQL + " FROM " + storage.Tbl_class_season + " s "
+	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_class_base + " b ON b." + storage.Fld_common_id + "=s." + storage.Fld_common_id_base
+	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_sport_tables + " t ON t." + storage.Fld_common_id_season + "=s." + storage.Fld_common_id + " AND t." + storage.Fld_common_id_team + " IN (" + sIDs + ")"
+	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_class_team + " tm ON tm." + storage.Fld_common_id + "=t." + storage.Fld_common_id_team
+	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_countries + " c ON c." + storage.Fld_common_id + "=tm." + storage.Fld_common_id_country
+	sSQL = sSQL + " WHERE tm." + storage.Fld_common_id + " IN (" + sIDs + ") "
+	sSQL = sSQL + " ORDER BY " + storage.Fld_class_season_season + " DESC, s." + storage.Fld_common_sort_order + " DESC "
+
+	rows, err := s.db.Query(sSQL)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
+	}
+
+	defer rows.Close()
+	var list []storage.TblTeam
+	for rows.Next() {
+		var team storage.TblTeam
+		var teamName string
+		var ctrName string
+		err := rows.Scan(
+			&team.ID,
+			&teamName,
+			&ctrName,
+			&team.SeasonID,
+			&team.Season,
+			&team.SeasonName,
+			&team.LeagueRank,
+			&team.Place,
+			&team.StageIndex,
+			&team.Wins,
+			&team.WinsET,
+			&team.Draws,
+			&team.LossesET,
+			&team.Losses,
+			&team.Goals_For,
+			&team.Goals_Against,
+		)
+		if err != nil {
+			return nil, err
+		}
+		team.Name = GetSportTeamName(teamName, ctrName)
+		team.Place, err = s.GetPlaceAsStr(team.ID, team.StageIndex, team.Place)
+		leagueRank, err := strconv.Atoi(team.LeagueRank)
+		if err != nil {
+			leagueRank = 0
+		}
+		team.LeagueRank = s.GetSportRankAsInt(leagueRank)
+		list = append(list, team)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return list, nil
 }
