@@ -1,8 +1,11 @@
 package sqlite
 
 import (
+	"CabinetREST/internal/http-server/handlers/auth"
 	"CabinetREST/internal/storage"
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -54,6 +57,58 @@ func New(storagePath string) (*Storage, error) {
 		return id, nil
 	}
 */
+
+/*
+********************************************************************
+
+	GetUserByLogin
+
+********************************************************************
+*/
+func (s *Storage) GetUserByLogin(
+	ctx context.Context,
+	loginName string,
+) (auth.User, error) {
+	query := fmt.Sprintf(
+		`SELECT %s, %s, %s, %s
+		 FROM %s
+		 WHERE %s = ?
+		 LIMIT 1`,
+		storage.Fld_common_id,
+		storage.Fld_user_management_login_name,
+		storage.Fld_user_management_user_password_hash,
+		storage.Fld_user_management_enabled,
+		storage.Tbl_user_management_users,
+		storage.Fld_user_management_login_name,
+	)
+
+	var user auth.User
+	var enabled int
+
+	err := s.db.QueryRowContext(
+		ctx,
+		query,
+		loginName,
+	).Scan(
+		&user.ID,
+		&user.LoginName,
+		&user.PasswordHash,
+		&enabled,
+	)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return auth.User{}, auth.ErrUserNotFound
+	}
+
+	if err != nil {
+		return auth.User{}, fmt.Errorf(
+			"get user by login: %w",
+			err,
+		)
+	}
+	user.Enabled = enabled != 0
+	return user, nil
+}
 
 /*********************************************************************
   Territories for parent.
@@ -596,22 +651,26 @@ func (s *Storage) DB_GetSeasonVariables(id int) (ti storage.TournamentInfo, e er
 		IFNULL(b.` + storage.Fld_common_name + `, '') AS vs,
 		IFNULL(s.` + storage.Fld_class_season_plain_text + `, ''),
 		IFNULL(s.` + storage.Fld_class_season_remark_text + `, ''),
-		IFNULL(s.` + storage.Fld_common_prefix + `, '')
+		IFNULL(s.` + storage.Fld_common_prefix + `, ''),
+		IFNULL(s.` + storage.Fld_class_season_points + `, ''),
+		IFNULL(s.` + storage.Fld_class_round_standings + `, '')
 	FROM ` + storage.Tbl_class_season + ` s
 	LEFT JOIN ` + storage.Tbl_class_base + ` b
 	ON s.` + storage.Fld_common_id_base + ` = b.` + storage.Fld_common_id + `
 	WHERE s.` + storage.Fld_common_id + ` = ?`
 
 	var (
-		name       sql.NullString
-		groupID    sql.NullInt64
-		season     sql.NullString
-		options1   sql.NullString
-		leagueRank sql.NullInt64
-		baseName   sql.NullString
-		plainText  sql.NullString
-		remark     sql.NullString
-		prefix     sql.NullString
+		name           sql.NullString
+		groupID        sql.NullInt64
+		season         sql.NullString
+		options1       sql.NullString
+		leagueRank     sql.NullInt64
+		baseName       sql.NullString
+		plainText      sql.NullString
+		remark         sql.NullString
+		prefix         sql.NullString
+		points         sql.NullString
+		roundStandings sql.NullString
 	)
 
 	err := s.db.QueryRow(sSQL, id).Scan(
@@ -624,6 +683,8 @@ func (s *Storage) DB_GetSeasonVariables(id int) (ti storage.TournamentInfo, e er
 		&plainText,
 		&remark,
 		&prefix,
+		&points,
+		&roundStandings,
 	)
 	if err != nil {
 		return info, err
@@ -635,9 +696,12 @@ func (s *Storage) DB_GetSeasonVariables(id int) (ti storage.TournamentInfo, e er
 	}
 
 	info.Title = baseName.String + ". " + titlePrefix + name.String + ". " + season.String
-	info.ViewOpt, info.ResultsOf = parseViewOption(options1.String)
+	info.ViewOpt, info.ResultOf = parseViewOption(options1.String)
 	info.Rank = int(leagueRank.Int64)
 	info.IsOk = true
+	info.RoundStandings = roundStandings.String
+	info.TableFormat, info.Points = parseSeasonPoints(points.String)
+
 	return info, err
 }
 
@@ -648,21 +712,26 @@ func (s *Storage) DB_GetSeasonVariables(id int) (ti storage.TournamentInfo, e er
 
 *********************************************************************
 */
-func (s *Storage) ShowData_Table(idSeason int) ([]storage.TournamentMatrix, error) {
+func (s *Storage) ShowData_Table(idSeason int) ([]storage.TournamentMatrix, storage.TournamentInfo, error) {
+
 	const fn = "storage.sqlite.ShowData_Table"
+	info, err := s.DB_GetSeasonVariables(idSeason)
+	if err != nil {
+		return nil, storage.TournamentInfo{}, fmt.Errorf("%s: %w", fn, err)
+	}
 
 	teams, err := s.loadTournamentMatrixTeams(idSeason)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", fn, err)
+		return nil, info, fmt.Errorf("%s: %w", fn, err)
 	}
 
 	if len(teams) == 0 {
-		return []storage.TournamentMatrix{}, nil
+		return []storage.TournamentMatrix{}, info, nil
 	}
 
 	matches, err := s.loadTournamentMatrixMatches(idSeason)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", fn, err)
+		return nil, info, fmt.Errorf("%s: %w", fn, err)
 	}
 
 	result := []storage.TournamentMatrix{
@@ -672,7 +741,7 @@ func (s *Storage) ShowData_Table(idSeason int) ([]storage.TournamentMatrix, erro
 		},
 	}
 
-	return result, nil
+	return result, info, nil
 }
 
 func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentMatrixTeam, error) {
@@ -680,14 +749,17 @@ func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentM
 		SELECT
 			IFNULL(t.` + storage.Fld_common_id_team + `, 0),
 			IFNULL(t.` + storage.Fld_common_sport_place + `, 0),
+			IFNULL(t.` + storage.Fld_sport_result_index + `, 0),
+			IFNULL(t.` + storage.Fld_sport_result_index + `_2, 0),
+			IFNULL(t.` + storage.Fld_sport_stage_index + `, 0),
 			IFNULL(ct.` + storage.Fld_common_name + `, ''),
 			IFNULL(cou.` + storage.Fld_common_name + `, ''),
-
 			IFNULL(t.` + storage.Fld_sport_games_played + `, 0),
 			IFNULL(t.` + storage.Fld_sport_points + `, 0),
 			IFNULL(t.` + storage.Fld_sport_points_adjustment + `, 0),
 			IFNULL(t.` + storage.Fld_sport_wins + `, 0),
 			IFNULL(t.` + storage.Fld_sport_wins_et + `, 0),
+			IFNULL(t.` + storage.Fld_sport_draws + `, 0),
 			IFNULL(t.` + storage.Fld_sport_losses_et + `, 0),
 			IFNULL(t.` + storage.Fld_sport_losses + `, 0),
 			IFNULL(t.` + storage.Fld_sport_goals_for + `, 0),
@@ -710,24 +782,31 @@ func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentM
 
 	for rows.Next() {
 		var (
-			teamID    int
-			place     int
-			teamName  string
-			cityName  string
-			games     int
-			points    int
-			pointsAdj int
-			wins      int
-			otWins    int
-			otLosses  int
-			losses    int
-			goalsFor  int
-			goalsAg   int
+			teamID       int
+			place        int
+			resultIndex  int
+			resultIndex2 int
+			stageIndex   int
+			teamName     string
+			cityName     string
+			games        int
+			points       int
+			pointsAdj    int
+			wins         int
+			otWins       int
+			draws        int
+			otLosses     int
+			losses       int
+			goalsFor     int
+			goalsAg      int
 		)
 
 		err := rows.Scan(
 			&teamID,
 			&place,
+			&resultIndex,
+			&resultIndex2,
+			&stageIndex,
 			&teamName,
 			&cityName,
 			&games,
@@ -735,6 +814,7 @@ func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentM
 			&pointsAdj,
 			&wins,
 			&otWins,
+			&draws,
 			&otLosses,
 			&losses,
 			&goalsFor,
@@ -747,11 +827,15 @@ func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentM
 		teams = append(teams, storage.TournamentMatrixTeam{
 			ID:           teamID,
 			Place:        place,
+			ResultIndex:  resultIndex,
+			ResultIndex2: resultIndex2,
+			StageIndex:   stageIndex,
 			Name:         GetSportTeamName(teamName, cityName),
 			Games:        games,
 			Points:       points + pointsAdj,
 			Wins:         wins,
 			OTWins:       otWins,
+			Draws:        draws,
 			OTLosses:     otLosses,
 			Losses:       losses,
 			GoalsFor:     goalsFor,
@@ -849,7 +933,7 @@ func (s *Storage) ShowData_Cup(ids int) ([]storage.TournamentCup, error) {
 	// Get cup winner
 	idCupWinner := -1
 
-	sSQL := "SELECT " + storage.Fld_common_winner_id
+	sSQL := "SELECT  IFNULL(" + storage.Fld_common_winner_id + ",-1) "
 	sSQL += " FROM " + storage.Tbl_class_season
 	sSQL += " WHERE " + storage.Fld_common_id + "=?"
 	err := s.db.QueryRow(sSQL, ids).Scan(&idCupWinner)

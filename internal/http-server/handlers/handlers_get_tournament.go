@@ -13,8 +13,12 @@ import (
 
 type ResponseTournament_Matrix struct {
 	resp.Response
-	DataType int                        `json:"datatype"`
-	Data     []storage.TournamentMatrix `json:"list"`
+	DataType       int                        `json:"datatype"`
+	TableFormat    int                        `json:"tableFormat"`
+	ResultOf       int                        `json:"resultOf"`
+	Points         storage.Points             `json:"points"`
+	RoundStandings string                     `json:"roundStandings"`
+	Data           []storage.TournamentMatrix `json:"list"`
 }
 
 type ResponseTournament_Cup struct {
@@ -62,14 +66,14 @@ func NewTournament(log *slog.Logger, s *sqlite.Storage) http.HandlerFunc {
 				return
 			}
 			responseTournamentPlainOK(w, r, plain)
-		} else if sqlite.Sport_IsTable(info.Rank) || info.ViewOpt == storage.KViewOption_Table || info.ResultsOf > 0 {
-			matrix, err := s.ShowData_Table(id)
+		} else if sqlite.Sport_IsTable(info.Rank) || info.ViewOpt == storage.KViewOption_Table || info.ResultOf > 0 {
+			matrix, info, err := s.ShowData_Table(id)
 			if err != nil {
 				log.Info(err.Error())
 				render.JSON(w, r, resp.Error(err.Error()))
 				return
 			}
-			responseTournamentMatrixOK(w, r, matrix)
+			responseTournamentMatrixOK(w, r, matrix, info)
 		} else if sqlite.Sport_IsList(info.Rank) || info.ViewOpt == storage.KViewOption_Cup {
 			cup, err := s.ShowData_Cup(id)
 			if err != nil {
@@ -83,11 +87,15 @@ func NewTournament(log *slog.Logger, s *sqlite.Storage) http.HandlerFunc {
 	}
 }
 
-func responseTournamentMatrixOK(w http.ResponseWriter, r *http.Request, data []storage.TournamentMatrix) {
+func responseTournamentMatrixOK(w http.ResponseWriter, r *http.Request, data []storage.TournamentMatrix, info storage.TournamentInfo) {
 	render.JSON(w, r, ResponseTournament_Matrix{
-		Response: resp.OK(),
-		DataType: 1,
-		Data:     data,
+		Response:       resp.OK(),
+		DataType:       1,
+		TableFormat:    info.TableFormat,
+		ResultOf:       info.ResultOf,
+		Points:         info.Points,
+		RoundStandings: info.RoundStandings,
+		Data:           data,
 	})
 }
 

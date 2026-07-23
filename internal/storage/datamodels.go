@@ -183,6 +183,11 @@ const Tbl_class_team = "class_team"
 const Tbl_class_season = "class_season"
 const Tbl_sport_results = "sport_results"
 const Tbl_sport_tables = "sport_tables"
+const Tbl_user_management_users = "usm_users"
+const Tbl_user_management_groups = "usm_groups"
+const Tbl_user_management_permissions = "usm_permissions"
+const Tbl_user_management_group_members = "usm_group_members"
+const Tbl_user_management_group_access = "usm_group_access"
 
 const Fld_common_id = "id"
 const Fld_common_sub_id = "sub_id"
@@ -478,6 +483,7 @@ const Fld_class_season_options_2 = "options_2"
 const Fld_class_season_plain_text = "plain_text"
 const Fld_class_season_group = "season_group"
 const Fld_class_season_remark_text = "remark_text"
+const Fld_class_round_standings = "round_standings"
 
 const Fld_sport_games_played = "games_played"
 const Fld_sport_wins = "wins"
@@ -519,6 +525,20 @@ const Fld_sport_result_type = "result_type" // 1= ОТ, 2=П(Б), 3: +/-
 const Fld_sport_match_type = "match_type"   // 1= home, 2=unknown
 const Fld_sport_stage_index = "stage_index"
 const Fld_sport_tour = "tour"
+
+const Fld_user_management_login_name = "login_name"
+const Fld_user_management_full_name = "full_name"
+const Fld_user_management_user_password_hash = "user_password_hash"
+const Fld_user_management_last_access = "last_access"
+const Fld_user_management_access_count = "access_count"
+const Fld_user_management_enabled = "enabled"
+const Fld_user_management_created = "created"
+const Fld_user_management_email = "email"
+const Fld_user_management_group_name = "group_name"
+const Fld_user_management_permission = "permission"
+const Fld_user_management_id_group = "id_group"
+const Fld_user_management_id_user = "id_user"
+const Fld_user_management_id_permission = "id_permission"
 
 const Fld_tmp_name = "nm"
 
@@ -598,7 +618,6 @@ type TblTeam struct {
 	Result     string
 	Stat
 }
-
 type TblTeamMatches struct {
 	TeamName1 string `json:"teamName1"`
 	TeamID1   int    `json:"teamId1"`
@@ -609,19 +628,22 @@ type TblTeamMatches struct {
 }
 
 type TournamentMatrixTeam struct {
-	ID    int    `json:"id"`
-	Place int    `json:"place"`
-	Name  string `json:"name"`
-
-	Games        int `json:"games"`
-	Points       int `json:"points"`
-	Wins         int `json:"wins"`
-	OTWins       int `json:"otWins"`
-	OTLosses     int `json:"otLosses"`
-	Losses       int `json:"losses"`
-	GoalsFor     int `json:"goalsFor"`
-	GoalsAgainst int `json:"goalsAgainst"`
-	Diff         int `json:"diff"`
+	ID           int    `json:"id"`
+	Place        int    `json:"place"`
+	ResultIndex  int    `json:"resultIndex"`
+	ResultIndex2 int    `json:"resultIndex2"`
+	StageIndex   int    `json:"stageIndex"`
+	Name         string `json:"name"`
+	Games        int    `json:"games"`
+	Points       int    `json:"points"`
+	Wins         int    `json:"wins"`
+	OTWins       int    `json:"otWins"`
+	Draws        int    `json:"draws"`
+	OTLosses     int    `json:"otLosses"`
+	Losses       int    `json:"losses"`
+	GoalsFor     int    `json:"goalsFor"`
+	GoalsAgainst int    `json:"goalsAgainst"`
+	Diff         int    `json:"diff"`
 }
 
 type TournamentMatrixMatch struct {
@@ -649,12 +671,24 @@ type TournamentPlainText struct {
 	PlainText string `json:"plainText"`
 }
 
+type Points struct {
+	Wins     int `json:"win"`
+	WinsET   int `json:"winEt"`
+	Draws    int `json:"draw"`
+	LossesET int `json:"lossEt"`
+	Losses   int `json:"loss"`
+	NA       int `json:"na"`
+}
+
 type TournamentInfo struct {
-	IsOk      bool
-	Title     string
-	ViewOpt   string
-	Rank      int
-	ResultsOf int
+	IsOk        bool
+	Title       string
+	ViewOpt     string
+	Rank        int
+	ResultOf    int
+	TableFormat int
+	Points
+	RoundStandings string
 }
 
 type SeasonOptions struct {

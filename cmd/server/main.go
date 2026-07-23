@@ -20,6 +20,7 @@ import (
 
 	"CabinetREST/internal/http-server/handlers"
 	territories "CabinetREST/internal/http-server/handlers"
+	"CabinetREST/internal/http-server/handlers/auth"
 	mwLogger "CabinetREST/internal/http-server/middleware/logger"
 )
 
@@ -73,8 +74,11 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	// router.Post(handlers.Url_Territories, countries.New(log, storage))
-	// router.Get(handlers.Url_Territories, countries.New(log, storage))
+	router.Post(
+		handlers.Url_login,
+		auth.NewLogin(log, storage),
+	)
+
 	router.Route(handlers.Url_Territories, func(r chi.Router) {
 		r.Use(middleware.BasicAuth("CabinetREST", map[string]string{
 			cfg.HTTPServer.User: cfg.HTTPServer.Password,

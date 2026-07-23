@@ -786,6 +786,65 @@ func parseViewOption(options string) (view string, resultsOf int) {
 	return
 }
 
+func parseIntDef(value string, def int) int {
+	n, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return def
+	}
+	return n
+}
+
+func parseSeasonPoints(points string) (resTableFormat int, pts storage.Points) {
+	resTableFormat = -1
+	pts.Wins = 0
+	pts.WinsET = 0
+	pts.Draws = 0
+	pts.LossesET = 0
+	pts.Losses = 0
+	pts.NA = 0
+
+	points = strings.TrimSpace(points)
+	if points == "" {
+		return
+	}
+
+	options := strings.Split(points, ";")
+
+	for _, option := range options {
+		option = strings.ToUpper(strings.TrimSpace(option))
+		if option == "" {
+			continue
+		}
+
+		parts := strings.Split(option, ",")
+		resTableFormat = len(parts)
+
+		switch resTableFormat {
+		case 3:
+			pts.Wins = parseIntDef(parts[0], 0)
+			pts.WinsET = 0
+			pts.Draws = parseIntDef(parts[1], 0)
+			pts.LossesET = 0
+			pts.Losses = parseIntDef(parts[2], 0)
+		case 4:
+			pts.Wins = parseIntDef(parts[0], 0)
+			pts.WinsET = 0
+			pts.Draws = parseIntDef(parts[1], 0)
+			pts.LossesET = 0
+			pts.Losses = parseIntDef(parts[2], 0)
+			pts.NA = parseIntDef(parts[3], 0) + 1
+		case 5:
+			pts.Wins = parseIntDef(parts[0], 0)
+			pts.WinsET = parseIntDef(parts[1], 0)
+			pts.Draws = parseIntDef(parts[2], 0)
+			pts.LossesET = parseIntDef(parts[3], 0)
+			pts.Losses = parseIntDef(parts[4], 0)
+		}
+	}
+
+	return
+}
+
 func SportDateToText(src string) string {
 	switch len(src) {
 	case 8:
