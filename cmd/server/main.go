@@ -1,27 +1,27 @@
 package main
 
 import (
-	"CabinetREST/internal/config"
-	"CabinetREST/internal/lib/logger/sl"
-	"CabinetREST/internal/storage/sqlite"
 	"context"
+	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"fmt"
-	"log/slog"
-	"os"
+	"CabinetREST/internal/config"
+	"CabinetREST/internal/http-server/handlers"
+	auth "CabinetREST/internal/http-server/handlers/auth"
+	appmiddleware "CabinetREST/internal/http-server/middleware"
+	mwLogger "CabinetREST/internal/http-server/middleware/logger"
+	jwtservice "CabinetREST/internal/jwt"
+	"CabinetREST/internal/lib/logger/sl"
+	"CabinetREST/internal/storage/sqlite"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-
-	"CabinetREST/internal/http-server/handlers"
-	territories "CabinetREST/internal/http-server/handlers"
-	"CabinetREST/internal/http-server/handlers/auth"
-	mwLogger "CabinetREST/internal/http-server/middleware/logger"
 )
 
 const (
@@ -48,6 +48,8 @@ func main() {
 	}
 
 	// init router
+	tokenService := jwtservice.NewTokenService(cfg.JWT.Secret, cfg.JWT.TTL)
+
 	router := chi.NewRouter()
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{
@@ -74,62 +76,49 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	router.Post(
-		handlers.Url_login,
-		auth.NewLogin(log, storage),
+	/* Публичный маршрут входа.
+	   Здесь OptionalJWT и JWT не нужны, потому что пользователь получает токен именно через этот endpoint. */
+	router.Post(handlers.Url_login,
+		auth.NewLogin(log, storage, tokenService),
 	)
 
-	router.Route(handlers.Url_Territories, func(r chi.Router) {
-		r.Use(middleware.BasicAuth("CabinetREST", map[string]string{
-			cfg.HTTPServer.User: cfg.HTTPServer.Password,
-			// can be more users here
-		}))
+	/* Защищённый маршрут.
+	   JWT обязателен. Если заголовка Authorization нет или токен некорректный, middleware вернёт: 401 Unauthorized
+	   Handler auth.NewMe будет вызван только после успешной проверки токена. */
+	router.With(appmiddleware.JWT(tokenService)).Get(
+		handlers.Url_Me,
+		auth.NewMe(log, storage),
+	)
 
-		r.Get("/search", territories.NewTerritorySearch(log, storage))
-		r.Get("/path", territories.NewTerritoryPath(log, storage))
-		r.Get("/{"+handlers.Url_Territories_ID+":[0-9]+}", territories.NewTerritoryChildren(log, storage))
-	})
+	/* Группа публичных маршрутов с необязательной JWT-аутентификацией.
+	   OptionalJWT выполняется перед каждым маршрутом внутри этой группы.
+	   Если токена нет:
+	   - запрос продолжает выполняться;
+	   - пользователь считается анонимным;
+	   - claims в context отсутствуют.
 
-	router.Route(handlers.Url_Seasons, func(r chi.Router) {
-		r.Use(middleware.BasicAuth("CabinetREST", map[string]string{
-			cfg.HTTPServer.User: cfg.HTTPServer.Password,
-		}))
-		r.Get("/", handlers.NewSeasons(log, storage))
-	})
+	   Если токен есть и он корректный:
+	   - JWT проверяется;
+	   - claims сохраняются в context;
+	   - handler может определить текущего пользователя.
 
-	router.Route(handlers.Url_Sports, func(r chi.Router) {
-		r.Use(middleware.BasicAuth("CabinetREST", map[string]string{
-			cfg.HTTPServer.User: cfg.HTTPServer.Password,
-		}))
-		r.Get("/", handlers.NewSports(log, storage))
-	})
+	   Если токен есть, но он некорректный:
+	   - запрос продолжает выполняться как анонимный;
+	   - claims в context отсутствуют. */
 
-	router.Route(handlers.Url_Teams, func(r chi.Router) {
-		r.Use(middleware.BasicAuth("CabinetREST", map[string]string{
-			cfg.HTTPServer.User: cfg.HTTPServer.Password,
-		}))
-		r.Get("/", handlers.NewTeams(log, storage))
-	})
-
-	router.Route(handlers.Url_Team_Matches, func(r chi.Router) {
-		r.Use(middleware.BasicAuth("CabinetREST", map[string]string{
-			cfg.HTTPServer.User: cfg.HTTPServer.Password,
-		}))
-		r.Get("/", handlers.NewTeamMatches(log, storage))
-	})
-
-	router.Route(handlers.Url_Tournament, func(r chi.Router) {
-		r.Use(middleware.BasicAuth("CabinetREST", map[string]string{
-			cfg.HTTPServer.User: cfg.HTTPServer.Password,
-		}))
-		r.Get("/", handlers.NewTournament(log, storage))
-	})
-
-	router.Route(handlers.Url_Team, func(r chi.Router) {
-		r.Use(middleware.BasicAuth("CabinetREST", map[string]string{
-			cfg.HTTPServer.User: cfg.HTTPServer.Password,
-		}))
-		r.Get("/", handlers.NewTeam(log, storage))
+	router.Group(func(r chi.Router) {
+		r.Use(appmiddleware.OptionalJWT(tokenService))
+		r.Route(handlers.Url_Territories, func(r chi.Router) {
+			r.Get("/search", handlers.NewTerritorySearch(log, storage))
+			r.Get("/path", handlers.NewTerritoryPath(log, storage))
+			r.Get("/{"+handlers.Url_Territories_ID+":[0-9]+}", handlers.NewTerritoryChildren(log, storage))
+		})
+		r.Route(handlers.Url_Seasons, func(r chi.Router) { r.Get("/", handlers.NewSeasons(log, storage)) })
+		r.Route(handlers.Url_Sports, func(r chi.Router) { r.Get("/", handlers.NewSports(log, storage)) })
+		r.Route(handlers.Url_Teams, func(r chi.Router) { r.Get("/", handlers.NewTeams(log, storage)) })
+		r.Route(handlers.Url_Team_Matches, func(r chi.Router) { r.Get("/", handlers.NewTeamMatches(log, storage)) })
+		r.Route(handlers.Url_Tournament, func(r chi.Router) { r.Get("/", handlers.NewTournament(log, storage)) })
+		r.Route(handlers.Url_Team, func(r chi.Router) { r.Get("/", handlers.NewTeam(log, storage)) })
 	})
 
 	// run server

@@ -3,5 +3,6 @@ http_server:
   address: "0.0.0.0:8082" # "localhost:8082"
   timeout: 4s # read request and also send answer
   idle_timeout: 60s # connection with client 
-  user: "myuser"
-  password: "mypass"
+jwt:
+  secret: "hj43l5h3141346hksdjhasd34894312r4123nn"
+  ttl: 720h # 30 × 24 = 720 hours

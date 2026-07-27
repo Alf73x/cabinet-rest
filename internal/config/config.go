@@ -13,14 +13,18 @@ type Config struct {
 	// StoragePath string  `yaml:"storage_path" env-required:"true"`
 	StoragePath string
 	HTTPServer  `yaml:"http_server"`
+	JWT         JWT `yaml:"jwt"`
+}
+
+type JWT struct {
+	Secret string        `yaml:"secret"`
+	TTL    time.Duration `yaml:"ttl"`
 }
 
 type HTTPServer struct {
 	Address     string        `yaml:"address" env-default:"localhost:8080"`
 	Timeout     time.Duration `yaml:"timeout" env-default:"4s"`
 	IdleTimeout time.Duration `yaml:"idle_timeout" env-default:"60s"`
-	User        string        `yaml:"user" env-required:"true"`
-	Password    string        `yaml:"password" env-required:"true" env:"HTTP_SERVER_PASSWORD"`
 }
 
 func MustLoad() *Config {

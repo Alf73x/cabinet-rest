@@ -1,6 +1,7 @@
 package handlers
 
 const Url_login = "/api/v1/auth/login"
+const Url_Me = "/api/v1/auth/me"
 
 const Url_Territories = "/api/v1/territories"
 const Url_Territories_ID = "id" // "/api/v1/territories/{id}"
