@@ -119,6 +119,8 @@ func main() {
 		r.Route(handlers.Url_Team_Matches, func(r chi.Router) { r.Get("/", handlers.NewTeamMatches(log, storage)) })
 		r.Route(handlers.Url_Tournament, func(r chi.Router) { r.Get("/", handlers.NewTournament(log, storage)) })
 		r.Route(handlers.Url_Team, func(r chi.Router) { r.Get("/", handlers.NewTeam(log, storage)) })
+
+		r.Get(handlers.Url_OpponentOptions, handlers.NewOpponentOptions(log, storage))
 	})
 
 	// run server

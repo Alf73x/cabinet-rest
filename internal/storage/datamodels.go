@@ -705,3 +705,16 @@ type SeasonOptions struct {
 	Root      int
 	ResultsOf int
 }
+
+type OpponentCity struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+type OpponentTeam struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	CityName string `json:"city_name"`
+	SportID  int    `json:"sport_id"`
+	// SportName string `json:"sport_name"`
+}

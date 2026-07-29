@@ -1,99 +1,55 @@
 package middleware
 
 import (
-	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 )
 
-type PermissionProvider interface {
-	GetUserPermissions(
-		ctx context.Context,
+type PermissionStorage interface {
+	HasPermission(
 		userID int64,
-	) ([]string, error)
+		permission string,
+	) (bool, error)
 }
 
-func RequirePermission(
-	log *slog.Logger,
-	permissionProvider PermissionProvider,
-	requiredPermission string,
-) func(http.Handler) http.Handler {
+/*
+RequirePermission проверяет, есть ли у текущего пользователя необходимое право.
+
+Важно: перед RequirePermission обязательно должен выполняться JWT middleware.
+
+JWT:
+  - проверяет токен;
+  - получает claims;
+  - сохраняет claims в context.
+
+RequirePermission:
+  - получает claims из context;
+  - берёт claims.UserID;
+  - проверяет право пользователя в БД;
+  - разрешает или запрещает выполнение handler.
+*/
+func RequirePermission(log *slog.Logger, storage PermissionStorage, permission string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims, ok := ClaimsFromContext(r.Context())
-			if !ok {
-				writePermissionError(
-					w,
-					http.StatusUnauthorized,
-					"unauthorized",
-				)
+			if !ok || claims == nil {
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 
-			permissions, err := permissionProvider.GetUserPermissions(
-				r.Context(),
-				claims.UserID,
-			)
+			hasPermission, err := storage.HasPermission(claims.UserID, permission)
 			if err != nil {
-				log.Error(
-					"failed to get user permissions",
-					slog.Int64("user_id", claims.UserID),
-					slog.String("permission", requiredPermission),
-					slog.String("error", err.Error()),
-				)
-
-				writePermissionError(
-					w,
-					http.StatusInternalServerError,
-					"internal server error",
-				)
+				log.Error("failed to check permission", slog.Int64("user_id", claims.UserID), slog.String("permission", permission), slog.String("error", err.Error()))
+				writeJSONError(w, http.StatusInternalServerError, "internal server error")
 				return
 			}
 
-			if !hasPermission(permissions, requiredPermission) {
-				log.Warn(
-					"permission denied",
-					slog.Int64("user_id", claims.UserID),
-					slog.String("login_name", claims.LoginName),
-					slog.String("permission", requiredPermission),
-				)
-
-				writePermissionError(
-					w,
-					http.StatusForbidden,
-					"permission denied",
-				)
+			if !hasPermission {
+				writeJSONError(w, http.StatusForbidden, "permission denied")
 				return
 			}
 
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-func hasPermission(
-	permissions []string,
-	requiredPermission string,
-) bool {
-	for _, permission := range permissions {
-		if permission == requiredPermission {
-			return true
-		}
-	}
-
-	return false
-}
-
-func writePermissionError(
-	w http.ResponseWriter,
-	status int,
-	message string,
-) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"error": message,
-	})
 }

@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"CabinetREST/internal/config"
 	"CabinetREST/internal/http-server/handlers/auth"
 	"CabinetREST/internal/storage"
 	"context"
@@ -1141,4 +1142,158 @@ func (s *Storage) Db_GetTeam(id int) ([]storage.TblTeam, error) {
 	}
 
 	return list, nil
+}
+
+/*********************************************************************
+  Db_GetOpponentOptions
+**********************************************************************/
+
+func (s *Storage) Db_GetOpponentOptions(sportIDs []int) ([]storage.OpponentCity, []storage.OpponentTeam, error) {
+	const _FunctionName = "sqlite.Db_GetOpponentOptions"
+
+	USE PRIVATE FLAG
+	cities, err := s.db_GetOpponentCities()
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s: get cities: %w", _FunctionName, err)
+	}
+
+	teams, err := s.db_GetOpponentTeams(sportIDs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%s: get teams: %w", _FunctionName, err)
+	}
+
+	return cities, teams, nil
+}
+
+func (s *Storage) db_GetOpponentCities() ([]storage.OpponentCity, error) {
+	query := fmt.Sprintf(` SELECT %s,  %s  FROM %s ORDER BY %s`,
+		storage.Fld_common_id,
+		storage.Fld_common_name,
+		storage.Tbl_countries,
+		storage.Fld_common_name,
+	)
+
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]storage.OpponentCity, 0)
+	for rows.Next() {
+		var item storage.OpponentCity
+		err = rows.Scan(&item.ID, &item.Name)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (s *Storage) db_GetOpponentTeams(sportIDs []int) ([]storage.OpponentTeam, error) {
+	const _FunctionName = "sqlite.db_GetOpponentTeams"
+
+	var caseSQL strings.Builder
+
+	caseSQL.WriteString("CASE t.")
+	caseSQL.WriteString(storage.Fld_common_group_id)
+	for i := 2; i < len(config.GsSportGroups); i++ {
+		r := []rune(config.GsSportGroups[i])
+		if len(r) == 0 {
+			continue
+		}
+		caseSQL.WriteString(fmt.Sprintf(" WHEN %d THEN ' (%s)'", i, string(r[0])))
+	}
+	caseSQL.WriteString(" ELSE '' END")
+
+	query := fmt.Sprintf(`SELECT t.%s, t.%s AS team, IFNULL(c.%s, '') AS city, IFNULL(b.%s, '') AS bname, t.%s AS bsid,
+		%s AS %s FROM %s t
+		LEFT JOIN %s c ON t.%s = c.%s
+		LEFT JOIN %s b ON b.%s = t.%s`,
+		storage.Fld_common_id, storage.Fld_common_name, storage.Fld_common_name, storage.Fld_common_name, storage.Fld_common_id_base,
+		caseSQL.String(), storage.Fld_tmp_name, storage.Tbl_class_team,
+		storage.Tbl_countries, storage.Fld_common_id_country, storage.Fld_common_id,
+		storage.Tbl_class_base, storage.Fld_common_id, storage.Fld_common_id_base,
+	)
+	args := make([]any, 0, len(sportIDs))
+	if len(sportIDs) > 0 {
+		query += fmt.Sprintf(` WHERE b.%s IN (%s)`, storage.Fld_common_id, makeOpponentPlaceholders(len(sportIDs)))
+		for _, sportID := range sportIDs {
+			args = append(args, sportID)
+		}
+	}
+	query += fmt.Sprintf(` ORDER BY t.%s, c.%s`, storage.Fld_common_name, storage.Fld_common_name)
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("%s: query: %w", _FunctionName, err)
+	}
+	defer rows.Close()
+
+	result := make([]storage.OpponentTeam, 0)
+
+	for rows.Next() {
+		var (
+			id          int
+			teamName    string
+			cityName    string
+			baseName    string
+			baseID      int
+			groupSuffix string
+		)
+		err = rows.Scan(
+			&id,
+			&teamName,
+			&cityName,
+			&baseName,
+			&baseID,
+			&groupSuffix,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%s: scan: %w", _FunctionName, err)
+		}
+
+		displayName := strings.Join(nonEmptyStrings(teamName, cityName, groupSuffix, baseName), " ")
+		displayName = strings.ReplaceAll(displayName, `"`, "")
+
+		result = append(result, storage.OpponentTeam{
+			ID:       id,
+			Name:     displayName,
+			CityName: strings.TrimSpace(cityName),
+			SportID:  baseID,
+		})
+
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: rows: %w", _FunctionName, err)
+	}
+
+	return result, nil
+}
+
+func makeOpponentPlaceholders(count int) string {
+	if count <= 0 {
+		return ""
+	}
+	return strings.TrimSuffix(strings.Repeat("?,", count), ",")
+}
+
+func nonEmptyStrings(values ...string) []string {
+	result := make([]string, 0, len(values))
+
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+
+		if value != "" {
+			result = append(result, value)
+		}
+	}
+
+	return result
 }
