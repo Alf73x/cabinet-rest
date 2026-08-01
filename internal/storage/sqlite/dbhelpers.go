@@ -4,6 +4,7 @@ import (
 	"CabinetREST/internal/config"
 	"CabinetREST/internal/storage"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -1019,4 +1020,33 @@ func SportGetStageValue(aiStage int, aiBase ...int) int {
 	}
 
 	return result
+}
+
+func (s *Storage) GetTeamNameByID(teamID int) (string, error) {
+	const op = "storage.GetTeamNameByID"
+
+	query := fmt.Sprintf(`SELECT t.%s,IFNULL(c.%s, '')  FROM %s t
+	LEFT JOIN %s c 	ON t.%s = c.%s WHERE t.%s = ?`,
+		storage.Fld_common_name,
+		storage.Fld_common_name,
+		storage.Tbl_class_team,
+		storage.Tbl_countries,
+		storage.Fld_common_id_country,
+		storage.Fld_common_id,
+		storage.Fld_common_id,
+	)
+
+	var teamName string
+	var cityName string
+
+	err := s.db.QueryRow(query, teamID).Scan(
+		&teamName, &cityName)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", fmt.Errorf("%s: team not found: id=%d", op, teamID)
+		}
+		return "", fmt.Errorf("%s: query team name: %w", op, err)
+	}
+
+	return GetSportTeamName(teamName, cityName), nil
 }

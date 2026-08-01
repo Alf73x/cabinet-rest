@@ -48,6 +48,11 @@ const (
 	RtScoreQuestion   = 17 // ?:?
 )
 
+const (
+	OpponentTypeTeam      = "team"
+	OpponentTypeTerritory = "territory"
+)
+
 const KSeasonsRank_1 = 1
 const KSeasonsRank_2 = 2
 const KSeasonsRank_3 = 3
@@ -578,16 +583,15 @@ type TblSport struct {
 }
 
 type Stat struct {
-	Games         int
-	Wins          int
-	WinsET        int
-	Draws         int
-	LossesET      int
-	Losses        int
-	Goals_For     int
-	Goals_Against int
+	Games         int `json:"games"`
+	Wins          int `json:"wins"`
+	WinsET        int `json:"winsET"`
+	Draws         int `json:"draws"`
+	LossesET      int `json:"lossesET"`
+	Losses        int `json:"losses"`
+	Goals_For     int `json:"goalsFor"`
+	Goals_Against int `json:"goalsAgainst"`
 }
-
 type TblTeams struct {
 	ID            int
 	SportID       int
@@ -717,4 +721,61 @@ type OpponentTeam struct {
 	CityName string `json:"city_name"`
 	SportID  int    `json:"sport_id"`
 	// SportName string `json:"sport_name"`
+}
+
+type ComparisonRow struct {
+	Team1   string `json:"team1"`
+	Team2   string `json:"team2"`
+	IDTeam1 int    `json:"team1_id"`
+	IDTeam2 int    `json:"team2_id"`
+
+	Total Stat `json:"total"`
+	Home  Stat `json:"home"`
+	Away  Stat `json:"away"`
+}
+
+type ComparisonTotals struct {
+	Total Stat `json:"total"`
+	Home  Stat `json:"home"`
+	Away  Stat `json:"away"`
+}
+
+type TblComparison struct {
+	Data   []ComparisonRow  `json:"list"`
+	Totals ComparisonTotals `json:"totals"`
+}
+
+func (s Stat) IsEmpty() bool {
+	return s.Wins == 0 &&
+		s.WinsET == 0 &&
+		s.Draws == 0 &&
+		s.LossesET == 0 &&
+		s.Losses == 0
+}
+
+func (s *Stat) CalculateGames() {
+	s.Games =
+		s.Wins +
+			s.WinsET +
+			s.Draws +
+			s.LossesET +
+			s.Losses
+}
+
+func (s *Stat) Add(other Stat) {
+	s.Wins += other.Wins
+	s.WinsET += other.WinsET
+	s.Draws += other.Draws
+	s.LossesET += other.LossesET
+	s.Losses += other.Losses
+	s.Goals_For += other.Goals_For
+	s.Goals_Against += other.Goals_Against
+
+	s.CalculateGames()
+}
+
+func (t *ComparisonTotals) AddRow(row ComparisonRow) {
+	t.Total.Add(row.Total)
+	t.Home.Add(row.Home)
+	t.Away.Add(row.Away)
 }

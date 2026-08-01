@@ -30,3 +30,14 @@ const Url_Team_ID = "id"
 
 const Url_OpponentOptions = "/api/v1/opponent_options" // "/api/v1/opponent_options?sport_ids=1,2"
 const Url_OpponentOptions_SportIDs = "sport_ids"
+const Url_Comparison = "/api/v1/opponent_comparison" // "api/v1/opponent_comparison?opponent1Type=territory&opponent1Id=3&opponent2Type=territory&opponent2Id=21&competitionFilter=all&sport_ids=1,2"
+const Url_Comparison_opponent1Type = "opponent1Type"
+const Url_Comparison_opponent1Id = "opponent1Id"
+const Url_Comparison_opponent2Type = "opponent2Type"
+const Url_Comparison_opponent2Id = "opponent2Id"
+const Url_Comparison_competitionFilter = "competitionFilter"
+const Url_Comparison_IDs_Sport = "sport_ids"
+const (
+	OpponentTypeTerritory = "territory"
+	OpponentTypeTeam      = "team"
+)

@@ -82,13 +82,21 @@ func main() {
 		auth.NewLogin(log, storage, tokenService),
 	)
 
-	/* Защищённый маршрут.
-	   JWT обязателен. Если заголовка Authorization нет или токен некорректный, middleware вернёт: 401 Unauthorized
-	   Handler auth.NewMe будет вызван только после успешной проверки токена. */
+	/* Защищённые маршруты.
+	   JWT обязателен. Если заголовка Authorization отсутствует
+	   или токен некорректный, middleware вернёт 401 Unauthorized.
+	   Handler будет вызван только после успешной проверки токена.
+	*/
 	router.With(appmiddleware.JWT(tokenService)).Get(
 		handlers.Url_Me,
 		auth.NewMe(log, storage),
 	)
+	/*§§§
+	router.With(appmiddleware.JWT(tokenService)).Get(
+		handlers.Url_Comparison,
+		handlers.NewComparison(log, storage),
+	)
+	*/
 
 	/* Группа публичных маршрутов с необязательной JWT-аутентификацией.
 	   OptionalJWT выполняется перед каждым маршрутом внутри этой группы.
@@ -121,6 +129,7 @@ func main() {
 		r.Route(handlers.Url_Team, func(r chi.Router) { r.Get("/", handlers.NewTeam(log, storage)) })
 
 		r.Get(handlers.Url_OpponentOptions, handlers.NewOpponentOptions(log, storage))
+		r.Get(handlers.Url_Comparison, handlers.NewComparison(log, storage))
 	})
 
 	// run server
