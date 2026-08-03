@@ -24,7 +24,7 @@ type ResponseComparison struct {
 }
 
 type IComparison interface {
-	Db_GetComparison(opponent1Type string, opponent1ID int, opponent2Type string, opponent2ID int, competitionFilter string, sportIDs []int) (storage.TblComparison, error)
+	Db_GetComparison(opponent1Type string, opponent1ID int, opponent2Type string, opponent2ID int, competitionFilter string, sportIDs []int, leagueRanks []int) (storage.TblComparison, error)
 }
 
 func NewComparison(log *slog.Logger, comparisonI IComparison) http.HandlerFunc {
@@ -74,13 +74,30 @@ func NewComparison(log *slog.Logger, comparisonI IComparison) http.HandlerFunc {
 			competitionFilter = "all"
 		}
 
-		sportIDs, err := ParseSportIDs(r.URL.Query().Get(Url_Comparison_IDs_Sport))
+		sportIDs, err := ParseSportIDs(
+			r.URL.Query().Get(Url_Comparison_IDs_Sport),
+		)
 		if err != nil {
-			http.Error(w, "invalid sport_ids", http.StatusBadRequest)
+			log.Error("invalid sport_ids", sl.Err(err))
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, resp.Error("invalid sport_ids"))
 			return
 		}
 
-		comparison, err := comparisonI.Db_GetComparison(opponent1Type, opponent1ID, opponent2Type, opponent2ID, competitionFilter, sportIDs)
+		leagueRanks := []int{}
+
+		leagueRanksText := r.URL.Query().Get(Url_Comparison_LeagueRanks)
+		if leagueRanksText != "" {
+			leagueRanks, err = ParseSportIDs(leagueRanksText)
+			if err != nil {
+				log.Error("invalid league_ranks", sl.Err(err))
+				render.Status(r, http.StatusBadRequest)
+				render.JSON(w, r, resp.Error("invalid league_ranks"))
+				return
+			}
+		}
+
+		comparison, err := comparisonI.Db_GetComparison(opponent1Type, opponent1ID, opponent2Type, opponent2ID, competitionFilter, sportIDs, leagueRanks)
 		if err != nil {
 			log.Error("failed to load comparison", sl.Err(err))
 			render.JSON(w, r, resp.Error("failed to load comparison"))

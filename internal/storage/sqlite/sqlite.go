@@ -1309,10 +1309,12 @@ func nonEmptyStrings(values ...string) []string {
 *********************************************************************
 */
 
-func (s *Storage) Db_GetComparison(opponent1Type string, opponent1ID int, opponent2Type string, opponent2ID int, competitionFilter string, sportIDs []int) (storage.TblComparison, error) {
+func (s *Storage) Db_GetComparison(opponent1Type string, opponent1ID int, opponent2Type string, opponent2ID int, competitionFilter string, sportIDs []int, leagueRanks []int) (storage.TblComparison, error) {
 	const op = "storage.Db_GetComparison"
 
-	result := storage.TblComparison{Data: make([]storage.ComparisonRow, 0)}
+	result := storage.TblComparison{
+		Data: make([]storage.ComparisonRow, 0),
+	}
 
 	teamIDs1, err := s.getComparisonTeamIDs(opponent1Type, opponent1ID, sportIDs)
 	if err != nil {
@@ -1340,7 +1342,7 @@ func (s *Storage) Db_GetComparison(opponent1Type string, opponent1ID int, oppone
 				return storage.TblComparison{}, fmt.Errorf("%s: get team 2 name: %w", op, err)
 			}
 
-			row, err := s.getComparisonRow(teamID1, teamName1, teamID2, teamName2, competitionFilter, sportIDs)
+			row, err := s.getComparisonRow(teamID1, teamName1, teamID2, teamName2, competitionFilter, leagueRanks)
 			if err != nil {
 				return storage.TblComparison{}, fmt.Errorf("%s: compare teams %d and %d: %w", op, teamID1, teamID2, err)
 			}
@@ -1356,7 +1358,6 @@ func (s *Storage) Db_GetComparison(opponent1Type string, opponent1ID int, oppone
 
 	return result, nil
 }
-
 func (s *Storage) getComparisonTeamIDs(opponentType string, opponentID int, sportIDs []int) ([]int, error) {
 	switch opponentType {
 	case "territory":
@@ -1454,19 +1455,17 @@ func (s *Storage) getTeamIDForSports(teamID int, sportIDs []int) ([]int, error) 
 	return []int{id}, nil
 }
 
-func (s *Storage) getComparisonRow(teamID1 int, teamName1 string, teamID2 int, teamName2 string, competitionFilter string, sportIDs []int) (storage.ComparisonRow, error) {
-	home, err := s.getDirectComparisonStat(teamID1, teamID2, competitionFilter, sportIDs)
+func (s *Storage) getComparisonRow(teamID1 int, teamName1 string, teamID2 int, teamName2 string, competitionFilter string, leagueRanks []int) (storage.ComparisonRow, error) {
+	home, err := s.getDirectComparisonStat(teamID1, teamID2, competitionFilter, leagueRanks)
 	if err != nil {
 		return storage.ComparisonRow{}, err
 	}
 
-	reverse, err := s.getDirectComparisonStat(teamID2, teamID1, competitionFilter, sportIDs)
+	reverse, err := s.getDirectComparisonStat(teamID2, teamID1, competitionFilter, leagueRanks)
 	if err != nil {
 		return storage.ComparisonRow{}, err
 	}
 
-	// Reverse statistics must be converted
-	// to teamID1's point of view.
 	away := storage.Stat{
 		Wins:          reverse.Losses,
 		WinsET:        reverse.LossesET,
@@ -1476,6 +1475,7 @@ func (s *Storage) getComparisonRow(teamID1 int, teamName1 string, teamID2 int, t
 		Goals_For:     reverse.Goals_Against,
 		Goals_Against: reverse.Goals_For,
 	}
+
 	away.CalculateGames()
 
 	total := home
@@ -1497,11 +1497,25 @@ func (s *Storage) getDirectComparisonStat(teamID1 int, teamID2 int, competitionF
 	if err != nil {
 		return storage.Stat{}, err
 	}
+
 	rankFilterSQL, rankFilterArgs := s.buildSportComparisonRankFilter(leagueRanks)
 
-	query := fmt.Sprintf(`SELECT COALESCE(SUM(W + Wpm), 0) AS W, COALESCE(SUM(D + Dpm + Dex), 0) AS D, COALESCE(SUM(L + Lpm + Dpm), 0) AS L, COALESCE(SUM(Wet + Wex1 + Wex2), 0) AS We, COALESCE(SUM(Let + Lex1 + Lex2), 0) AS Le, COALESCE(SUM(S), 0) AS S, COALESCE(SUM(M), 0) AS M, COALESCE(SUM(Cnt), 0) AS Cnt
+	query := fmt.Sprintf(`
+		SELECT
+			COALESCE(SUM(W + Wpm), 0) AS W,
+			COALESCE(SUM(D + Dpm + Dex), 0) AS D,
+			COALESCE(SUM(L + Lpm), 0) AS L,
+			COALESCE(SUM(Wet + Wex1 + Wex2), 0) AS We,
+			COALESCE(SUM(Let + Lex1 + Lex2), 0) AS Le,
+			COALESCE(SUM(S), 0) AS S,
+			COALESCE(SUM(M), 0) AS M,
+			COALESCE(SUM(Cnt), 0) AS Cnt
 		FROM (
-			SELECT r.%[1]s, se.%[2]s, 1 AS Cnt,
+			SELECT
+				r.%[1]s,
+				se.%[2]s,
+				1 AS Cnt,
+
 				CASE WHEN r.%[3]s = ? AND r.%[4]s > r.%[5]s THEN 1 ELSE 0 END AS W,
 				CASE WHEN r.%[3]s = ? AND r.%[4]s < r.%[5]s THEN 1 ELSE 0 END AS L,
 				CASE WHEN r.%[3]s = ? AND r.%[4]s = r.%[5]s AND r.%[6]s > r.%[7]s THEN 1 ELSE 0 END AS Wet,
@@ -1520,12 +1534,13 @@ func (s *Storage) getDirectComparisonStat(teamID1 int, teamID2 int, competitionF
 
 				CASE WHEN r.%[4]s = -1 THEN 0 ELSE r.%[4]s END AS S,
 				CASE WHEN r.%[5]s = -1 THEN 0 ELSE r.%[5]s END AS M
-			FROM %[8]s AS r
-			LEFT JOIN %[9]s AS se ON se.%[10]s = r.%[1]s
-			WHERE r.%[11]s = ? AND r.%[12]s = ?
+			FROM %[8]s r
+			LEFT JOIN %[9]s se ON se.%[10]s = r.%[1]s
+			WHERE r.%[11]s = ?
+			  AND r.%[12]s = ?
 			  %s
 			  %s
-		) AS comparison_data`,
+		) comparison_data`,
 		storage.Fld_common_id_season,         // 1
 		storage.Fld_class_season_league_rank, // 2
 		storage.Fld_sport_result_type,        // 3
@@ -1542,7 +1557,8 @@ func (s *Storage) getDirectComparisonStat(teamID1 int, teamID2 int, competitionF
 		rankFilterSQL,
 	)
 
-	args := make([]any, 0, 40)
+	args := make([]any, 0, 50)
+
 	args = append(args,
 		storage.RtScoreNormal,
 		storage.RtScoreNormal,
@@ -1588,7 +1604,12 @@ func (s *Storage) getDirectComparisonStat(teamID1 int, teamID2 int, competitionF
 		&stat.Games,
 	)
 	if err != nil {
-		return storage.Stat{}, fmt.Errorf("get direct comparison stat for teams %d and %d: %w", teamID1, teamID2, err)
+		return storage.Stat{}, fmt.Errorf(
+			"get direct comparison stat for teams %d and %d: %w",
+			teamID1,
+			teamID2,
+			err,
+		)
 	}
 
 	return stat, nil

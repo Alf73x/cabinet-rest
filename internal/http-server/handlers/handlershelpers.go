@@ -7,26 +7,26 @@ import (
 )
 
 func ParseSportIDs(value string) ([]int, error) {
+	value = strings.TrimSpace(value)
 	if value == "" {
-		return nil, nil
+		return []int{}, nil
 	}
+
 	parts := strings.Split(value, ",")
-	ids := make([]int, 0, len(parts))
+	result := make([]int, 0, len(parts))
+
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
-		if part == "" {
-			return nil, fmt.Errorf("empty sport id")
-		}
+
 		id, err := strconv.Atoi(part)
-		if err != nil {
-			return nil, fmt.Errorf("invalid sport id: %s", part)
+		if err != nil || id <= 0 {
+			return nil, fmt.Errorf("invalid integer value %q", part)
 		}
-		if id <= 0 {
-			return nil, fmt.Errorf("sport id must be positive: %d", id)
-		}
-		ids = append(ids, id)
+
+		result = append(result, id)
 	}
-	return ids, nil
+
+	return result, nil
 }
 
 func SportIDsToString(ids []int) string {
