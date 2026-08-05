@@ -42,3 +42,14 @@ const (
 	OpponentTypeTeam      = "team"
 )
 const Url_Comparison_LeagueRanks = "league_ranks"
+const Url_ComparisonMatches = "/api/v1/opponent_comparison/matches"
+const Url_ComparisonMatches_Team1ID = "team1_id"
+const Url_ComparisonMatches_Team2ID = "team2_id"
+
+const Url_SummaryCategories = "/api/v1/summary_tables/categories" // "api/v1/summary_tables/categories"
+const Url_SummaryTables = "/api/v1/summary_tables"                //"api/v1/summary_tables?category=&league_ranks=1&year_from=1935&year_to=1965&sport_ids=1"
+const Url_SummaryTables_Category = "category"
+const Url_SummaryTables_LeagueRanks = "league_ranks"
+const Url_SummaryTables_YearFrom = "year_from"
+const Url_SummaryTables_YearTo = "year_to"
+const Url_SummaryTables_SportIDs = "sport_ids"

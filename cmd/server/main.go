@@ -130,6 +130,10 @@ func main() {
 
 		r.Get(handlers.Url_OpponentOptions, handlers.NewOpponentOptions(log, storage))
 		r.Get(handlers.Url_Comparison, handlers.NewComparison(log, storage))
+		r.Get(handlers.Url_ComparisonMatches, handlers.NewComparisonMatches(log, storage))
+
+		r.Get(handlers.Url_SummaryCategories, handlers.NewSummaryCategories(log, storage))
+		r.Get(handlers.Url_SummaryTables, handlers.NewSummaryTable(log, storage))
 	})
 
 	// run server

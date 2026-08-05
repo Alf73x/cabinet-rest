@@ -779,3 +779,38 @@ func (t *ComparisonTotals) AddRow(row ComparisonRow) {
 	t.Home.Add(row.Home)
 	t.Away.Add(row.Away)
 }
+
+type SummaryCategory struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+type TblSummaryCategories []SummaryCategory
+
+type SummaryTableRow struct {
+	Place         int    `json:"place"`
+	TeamID        int    `json:"teamId"`
+	TeamName      string `json:"teamName"`
+	TerritoryName string `json:"territoryName"`
+	CountryName   string `json:"countryName"`
+	Favorite      bool   `json:"favorite"`
+
+	Games    int `json:"games"`
+	Wins     int `json:"wins"`
+	WinsET   int `json:"winsET"`
+	Draws    int `json:"draws"`
+	LossesET int `json:"lossesET"`
+	Losses   int `json:"losses"`
+
+	GoalsFor     int `json:"goalsFor"`
+	GoalsAgainst int `json:"goalsAgainst"`
+	GoalDiff     int `json:"goalDiff"`
+
+	WinPercent  float64 `json:"winPercent"`
+	LossPercent float64 `json:"lossPercent"`
+}
+
+type TblSummaryTable struct {
+	Title string            `json:"title"`
+	Rows  []SummaryTableRow `json:"rows"`
+}
