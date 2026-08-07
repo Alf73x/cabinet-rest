@@ -54,6 +54,7 @@ func main() {
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{
 			"http://localhost:5173",
+			"http://127.0.0.1:5173",
 		},
 		AllowedMethods: []string{
 			"GET",
@@ -67,7 +68,8 @@ func main() {
 			"Authorization",
 			"Content-Type",
 		},
-		MaxAge: 300,
+		AllowCredentials: true,
+		MaxAge:           300,
 	}))
 
 	router.Use(middleware.RequestID)
@@ -145,8 +147,8 @@ func main() {
 	srv := &http.Server{
 		Addr:         cfg.Address,
 		Handler:      router,
-		ReadTimeout:  cfg.HTTPServer.Timeout,
-		WriteTimeout: cfg.HTTPServer.Timeout,
+		ReadTimeout:  cfg.HTTPServer.ReadTimeout,
+		WriteTimeout: cfg.HTTPServer.WriteTimeout,
 		IdleTimeout:  cfg.HTTPServer.IdleTimeout,
 	}
 

@@ -294,6 +294,7 @@ const Fld_common_pdf = "pdf"
 
 const Fld_common_group_id = "group_id"
 const Fld_common_sort_order = "sort_order"
+const Fld_common_icon_index = "icon_index"
 
 const Fld_common_id_team = "id_team"
 const Fld_common_id_team_1 = "id_team_1"
@@ -563,17 +564,18 @@ type TblCountry struct {
 }
 
 type TblSeason struct {
-	ID         int
-	Season     string
-	Prefix     string
-	Name       string
-	SportID    int
-	GroupID    int
-	LeagueRank int
-	SortOrder  int
-	Points     string
-	Options1   string
-	Options2   string
+	ID         int    `json:"id"`
+	Season     string `json:"season"`
+	Prefix     string `json:"prefix"`
+	Name       string `json:"name"`
+	SportID    int    `json:"sport_id"`
+	GroupID    int    `json:"group_id"`
+	LeagueRank int    `json:"league_rank"`
+	SortOrder  int    `json:"sort_order"`
+	Points     string `json:"points"`
+	Options1   string `json:"options_1"`
+	Options2   string `json:"options_2"`
+	IconIndex  int    `json:"icon_index"`
 }
 
 type TblSport struct {

@@ -1,7 +1,8 @@
 env: "prod" # local, dev, prod
 http_server:
   address: "0.0.0.0:8082" # "localhost:8082"
-  timeout: 4s # read request and also send answer
+  read_timeout: 60s # read request 
+  write_timeout: 60s  # send answer
   idle_timeout: 60s # connection with client 
 jwt:
   secret: "hzfh4546425fd356e5hd"

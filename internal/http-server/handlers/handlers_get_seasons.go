@@ -16,19 +16,26 @@ type ResponseSeasons struct {
 	Data []storage.TblSeason `json:"list"`
 }
 
+type ResponseSeasonNames struct {
+	resp.Response
+	Data []string `json:"list"`
+}
+
 type IGetSeasons interface {
 	Db_GetSeasons(idsSport string, filterSeason string, filterName string) ([]storage.TblSeason, error)
+	Db_GetSeasonNames(idsSport string) ([]string, error)
 }
 
 func NewSeasons(log *slog.Logger, getSeasonsI IGetSeasons) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewSeasons"
 
-		log = log.With(slog.String("op", _FunctionName),
+		log = log.With(
+			slog.String("op", _FunctionName),
 			slog.String("request=id", middleware.GetReqID(r.Context())),
 		)
 
-		idsSport, err := ParseSportIDs(r.URL.Query().Get("sport_ids"))
+		idsSport, err := ParseSportIDs(r.URL.Query().Get(Url_Seasons_IDs_Sport))
 		if err != nil {
 			log.Error(err.Error(), sl.Err(err))
 			render.JSON(w, r, resp.Error(err.Error()))
@@ -36,10 +43,30 @@ func NewSeasons(log *slog.Logger, getSeasonsI IGetSeasons) http.HandlerFunc {
 		}
 		strIdsSport := SportIDsToString(idsSport)
 
+		namesOnly := r.URL.Query().Get(Url_Seasons_Names) == "1"
+
+		if namesOnly {
+			// Если names=1 — возвращаем только список названий сезонов
+			listSeasonNames, err := getSeasonsI.Db_GetSeasonNames(strIdsSport)
+			if err != nil {
+				log.Error("failed to load season names", sl.Err(err))
+				render.JSON(w, r, resp.Error("failed to load season names"))
+				return
+			}
+
+			responseSeasonNamesOK(w, r, listSeasonNames)
+			return
+		}
+
+		// Обычный режим — возвращаем турниры
 		seasonFilter := r.URL.Query().Get(Url_Seasons_Season_Filter)
 		nameFilter := r.URL.Query().Get(Url_Seasons_Name_Filter)
 
-		listSeasons, err := getSeasonsI.Db_GetSeasons(strIdsSport, seasonFilter, nameFilter)
+		listSeasons, err := getSeasonsI.Db_GetSeasons(
+			strIdsSport,
+			seasonFilter,
+			nameFilter,
+		)
 		if err != nil {
 			log.Error("failed to load seasons", sl.Err(err))
 			render.JSON(w, r, resp.Error("failed to load seasons"))
@@ -52,6 +79,13 @@ func NewSeasons(log *slog.Logger, getSeasonsI IGetSeasons) http.HandlerFunc {
 
 func responseSeasonsOK(w http.ResponseWriter, r *http.Request, data []storage.TblSeason) {
 	render.JSON(w, r, ResponseSeasons{
+		Response: resp.OK(),
+		Data:     data,
+	})
+}
+
+func responseSeasonNamesOK(w http.ResponseWriter, r *http.Request, data []string) {
+	render.JSON(w, r, ResponseSeasonNames{
 		Response: resp.OK(),
 		Data:     data,
 	})

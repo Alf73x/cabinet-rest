@@ -257,6 +257,27 @@ func (s *Storage) Db_GetSeasons(idssport string, filterSeason string, filterName
 	if strings.TrimSpace(idssport) != "" {
 		sports = fmt.Sprintf(" AND %s IN (%s)", storage.Fld_common_id_base, idssport)
 	}
+	seasonValue := strings.ReplaceAll(filterSeason, "'", "''")
+
+	seasonFilter := ""
+	if strings.TrimSpace(seasonValue) != "" {
+		seasonFilter = fmt.Sprintf(
+			" AND %s = '%s'",
+			storage.Fld_class_season_season,
+			seasonValue,
+		)
+	}
+
+	nameValue := strings.ReplaceAll(filterName, "'", "''")
+
+	nameFilter := ""
+	if strings.TrimSpace(nameValue) != "" {
+		nameFilter = fmt.Sprintf(
+			" AND %s LIKE '%%%s%%'",
+			storage.Fld_common_name,
+			nameValue,
+		)
+	}
 
 	sSQL := fmt.Sprintf(`SELECT 
 		%s, %s,   
@@ -268,14 +289,15 @@ func (s *Storage) Db_GetSeasons(idssport string, filterSeason string, filterName
 		IFNULL(%s,0),  /* sort_order */
 		IFNULL(%s,""), /* points */
 		IFNULL(%s,""), /* options_1 */
-		IFNULL(%s,"")  /* options_2 */
+		IFNULL(%s,"") , /* options_2 */
+		IFNULL(%s, 0) /* icon_index */
 		FROM %s  
-		WHERE 1=1 %s
+		WHERE 1=1 %s %s %s
 		ORDER BY %s DESC, %s`, storage.Fld_common_id, storage.Fld_class_season_season, storage.Fld_common_prefix, storage.Fld_common_name, storage.Fld_common_id_base,
 		storage.Fld_common_group_id, storage.Fld_class_season_league_rank, storage.Fld_common_sort_order,
-		storage.Fld_class_season_points, storage.Fld_class_season_options_1, storage.Fld_class_season_options_2,
+		storage.Fld_class_season_points, storage.Fld_class_season_options_1, storage.Fld_class_season_options_2, storage.Fld_common_icon_index,
 		storage.Tbl_class_season,
-		sports,
+		sports, seasonFilter, nameFilter,
 		storage.Fld_class_season_season, storage.Fld_common_sort_order,
 	)
 
@@ -299,7 +321,8 @@ func (s *Storage) Db_GetSeasons(idssport string, filterSeason string, filterName
 			&seas.SortOrder,
 			&seas.Points,
 			&seas.Options1,
-			&seas.Options2)
+			&seas.Options2,
+			&seas.IconIndex)
 		if err != nil {
 			return nil, err
 		}
@@ -307,6 +330,46 @@ func (s *Storage) Db_GetSeasons(idssport string, filterSeason string, filterName
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
+	}
+
+	return seasons, nil
+}
+
+func (s *Storage) Db_GetSeasonNames(idssport string) ([]string, error) {
+	const _FunctionName = "storage.sqlite.Db_GetSeasonNames"
+
+	sports := ""
+	if strings.TrimSpace(idssport) != "" {
+		sports = fmt.Sprintf(" AND %s IN (%s)", storage.Fld_common_id_base, idssport)
+	}
+
+	sSQL := fmt.Sprintf(`SELECT DISTINCT %s FROM %s WHERE 1=1 %s ORDER BY %s DESC`,
+		storage.Fld_class_season_season, // 1
+		storage.Tbl_class_season,        // 2
+		sports,                          // 3
+		storage.Fld_class_season_season, // 4
+	)
+
+	rows, err := s.db.Query(sSQL)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
+	}
+	defer rows.Close()
+
+	var seasons []string
+
+	for rows.Next() {
+		var season string
+
+		if err := rows.Scan(&season); err != nil {
+			return nil, fmt.Errorf("%s: %w", _FunctionName, err)
+		}
+
+		seasons = append(seasons, season)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
 	}
 
 	return seasons, nil
