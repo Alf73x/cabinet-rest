@@ -75,7 +75,7 @@ func (s *Storage) Tree_FindTreeChildrenIDs(AiID int) string {
 				}
 
 				err := rows.Scan(args...)
-				if err == nil {
+				if err != nil {
 					gListTree = append(gListTree, t)
 				}
 			}

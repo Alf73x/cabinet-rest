@@ -633,23 +633,38 @@ type TblTeamMatches struct {
 	Date      string `json:"date"`
 }
 
+type TournamentTeamStat struct {
+	Games        int `json:"games"`
+	Points       int `json:"points"`
+	Wins         int `json:"wins"`
+	OTWins       int `json:"otWins"`
+	Draws        int `json:"draws"`
+	OTLosses     int `json:"otLosses"`
+	Losses       int `json:"losses"`
+	GoalsFor     int `json:"goalsFor"`
+	GoalsAgainst int `json:"goalsAgainst"`
+	Diff         int `json:"diff"`
+}
+
 type TournamentMatrixTeam struct {
-	ID           int    `json:"id"`
-	Place        int    `json:"place"`
-	ResultIndex  int    `json:"resultIndex"`
-	ResultIndex2 int    `json:"resultIndex2"`
-	StageIndex   int    `json:"stageIndex"`
-	Name         string `json:"name"`
-	Games        int    `json:"games"`
-	Points       int    `json:"points"`
-	Wins         int    `json:"wins"`
-	OTWins       int    `json:"otWins"`
-	Draws        int    `json:"draws"`
-	OTLosses     int    `json:"otLosses"`
-	Losses       int    `json:"losses"`
-	GoalsFor     int    `json:"goalsFor"`
-	GoalsAgainst int    `json:"goalsAgainst"`
-	Diff         int    `json:"diff"`
+	ID           int                `json:"id"`
+	Place        int                `json:"place"`
+	ResultIndex  int                `json:"resultIndex"`
+	ResultIndex2 int                `json:"resultIndex2"`
+	StageIndex   int                `json:"stageIndex"`
+	Name         string             `json:"name"`
+	Games        int                `json:"games"`
+	Points       int                `json:"points"`
+	Wins         int                `json:"wins"`
+	OTWins       int                `json:"otWins"`
+	Draws        int                `json:"draws"`
+	OTLosses     int                `json:"otLosses"`
+	Losses       int                `json:"losses"`
+	GoalsFor     int                `json:"goalsFor"`
+	GoalsAgainst int                `json:"goalsAgainst"`
+	Diff         int                `json:"diff"`
+	Home         TournamentTeamStat `json:"home"`
+	Away         TournamentTeamStat `json:"away"`
 }
 
 type TournamentMatrixMatch struct {
@@ -730,6 +745,7 @@ type ComparisonRow struct {
 	Team2   string `json:"team2"`
 	IDTeam1 int    `json:"team1_id"`
 	IDTeam2 int    `json:"team2_id"`
+	SportID int    `json:"sport_id"`
 
 	Total Stat `json:"total"`
 	Home  Stat `json:"home"`
@@ -790,7 +806,9 @@ type SummaryCategory struct {
 type TblSummaryCategories []SummaryCategory
 
 type SummaryTableRow struct {
-	Place         int    `json:"place"`
+	Place   int `json:"place"`
+	SportID int `json:"sportId"`
+
 	TeamID        int    `json:"teamId"`
 	TeamName      string `json:"teamName"`
 	TerritoryName string `json:"territoryName"`

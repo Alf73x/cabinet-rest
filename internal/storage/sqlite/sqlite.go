@@ -825,7 +825,27 @@ func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentM
 			IFNULL(t.` + storage.Fld_sport_losses_et + `, 0),
 			IFNULL(t.` + storage.Fld_sport_losses + `, 0),
 			IFNULL(t.` + storage.Fld_sport_goals_for + `, 0),
-			IFNULL(t.` + storage.Fld_sport_goals_against + `, 0)
+			IFNULL(t.` + storage.Fld_sport_goals_against + `, 0),
+
+			IFNULL(t.` + storage.Fld_sport_home_games_played + `, 0),
+			IFNULL(t.` + storage.Fld_sport_home_points + `, 0),
+			IFNULL(t.` + storage.Fld_sport_home_wins + `, 0),
+			IFNULL(t.` + storage.Fld_sport_home_wins_et + `, 0),
+			IFNULL(t.` + storage.Fld_sport_home_draws + `, 0),
+			IFNULL(t.` + storage.Fld_sport_home_losses_et + `, 0),
+			IFNULL(t.` + storage.Fld_sport_home_losses + `, 0),
+			IFNULL(t.` + storage.Fld_sport_home_goals_for + `, 0),
+			IFNULL(t.` + storage.Fld_sport_home_goals_against + `, 0),
+
+			IFNULL(t.` + storage.Fld_sport_away_games_played + `, 0),
+			IFNULL(t.` + storage.Fld_sport_away_points + `, 0),
+			IFNULL(t.` + storage.Fld_sport_away_wins + `, 0),
+			IFNULL(t.` + storage.Fld_sport_away_wins_et + `, 0),
+			IFNULL(t.` + storage.Fld_sport_away_draws + `, 0),
+			IFNULL(t.` + storage.Fld_sport_away_losses_et + `, 0),
+			IFNULL(t.` + storage.Fld_sport_away_losses + `, 0),
+			IFNULL(t.` + storage.Fld_sport_away_goals_for + `, 0),
+			IFNULL(t.` + storage.Fld_sport_away_goals_against + `, 0)
 		FROM ` + storage.Tbl_sport_tables + ` t
 		LEFT JOIN ` + storage.Tbl_class_team + ` ct
 			ON ct.` + storage.Fld_common_id + ` = t.` + storage.Fld_common_id_team + `
@@ -861,6 +881,26 @@ func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentM
 			losses       int
 			goalsFor     int
 			goalsAg      int
+
+			homeGames    int
+			homePoints   int
+			homeWins     int
+			homeOTWins   int
+			homeDraws    int
+			homeOTLosses int
+			homeLosses   int
+			homeGoalsFor int
+			homeGoalsAg  int
+
+			awayGames    int
+			awayPoints   int
+			awayWins     int
+			awayOTWins   int
+			awayDraws    int
+			awayOTLosses int
+			awayLosses   int
+			awayGoalsFor int
+			awayGoalsAg  int
 		)
 
 		err := rows.Scan(
@@ -881,6 +921,26 @@ func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentM
 			&losses,
 			&goalsFor,
 			&goalsAg,
+
+			&homeGames,
+			&homePoints,
+			&homeWins,
+			&homeOTWins,
+			&homeDraws,
+			&homeOTLosses,
+			&homeLosses,
+			&homeGoalsFor,
+			&homeGoalsAg,
+
+			&awayGames,
+			&awayPoints,
+			&awayWins,
+			&awayOTWins,
+			&awayDraws,
+			&awayOTLosses,
+			&awayLosses,
+			&awayGoalsFor,
+			&awayGoalsAg,
 		)
 		if err != nil {
 			return nil, err
@@ -903,6 +963,32 @@ func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentM
 			GoalsFor:     goalsFor,
 			GoalsAgainst: goalsAg,
 			Diff:         goalsFor - goalsAg,
+
+			Home: storage.TournamentTeamStat{
+				Games:        homeGames,
+				Points:       homePoints,
+				Wins:         homeWins,
+				OTWins:       homeOTWins,
+				Draws:        homeDraws,
+				OTLosses:     homeOTLosses,
+				Losses:       homeLosses,
+				GoalsFor:     homeGoalsFor,
+				GoalsAgainst: homeGoalsAg,
+				Diff:         homeGoalsFor - homeGoalsAg,
+			},
+
+			Away: storage.TournamentTeamStat{
+				Games:        awayGames,
+				Points:       awayPoints,
+				Wins:         awayWins,
+				OTWins:       awayOTWins,
+				Draws:        awayDraws,
+				OTLosses:     awayOTLosses,
+				Losses:       awayLosses,
+				GoalsFor:     awayGoalsFor,
+				GoalsAgainst: awayGoalsAg,
+				Diff:         awayGoalsFor - awayGoalsAg,
+			},
 		})
 	}
 
@@ -1517,6 +1603,11 @@ func (s *Storage) getTeamIDForSports(teamID int, sportIDs []int) ([]int, error) 
 }
 
 func (s *Storage) getComparisonRow(teamID1 int, teamName1 string, teamID2 int, teamName2 string, competitionFilter string, leagueRanks []int) (storage.ComparisonRow, error) {
+	sportID, err := s.getTeamSportID(teamID1)
+	if err != nil {
+		return storage.ComparisonRow{}, err
+	}
+
 	home, err := s.getDirectComparisonStat(teamID1, teamID2, competitionFilter, leagueRanks)
 	if err != nil {
 		return storage.ComparisonRow{}, err
@@ -1543,6 +1634,7 @@ func (s *Storage) getComparisonRow(teamID1 int, teamName1 string, teamID2 int, t
 	total.Add(away)
 
 	return storage.ComparisonRow{
+		SportID: sportID,
 		Team1:   teamName1,
 		Team2:   teamName2,
 		IDTeam1: teamID1,
@@ -1755,6 +1847,23 @@ func (s *Storage) buildSportComparisonRankFilter(leagueRanks []int) (string, []a
 
 	filter := fmt.Sprintf("AND se.%s IN (%s)", storage.Fld_class_season_league_rank, strings.Join(placeholders, ","))
 	return filter, args
+}
+
+func (s *Storage) getTeamSportID(teamID int) (int, error) {
+	query := fmt.Sprintf(
+		`SELECT %s FROM %s WHERE %s = ?`,
+		storage.Fld_common_id_base,
+		storage.Tbl_class_team,
+		storage.Fld_common_id,
+	)
+
+	var sportID int
+
+	if err := s.db.QueryRow(query, teamID).Scan(&sportID); err != nil {
+		return 0, fmt.Errorf("get sport ID for team %d: %w", teamID, err)
+	}
+
+	return sportID, nil
 }
 
 /*
@@ -2027,6 +2136,7 @@ func (s *Storage) Db_GetSummaryTable(
 	query := fmt.Sprintf(`
 		SELECT
 			tt.tid,
+			IFNULL(ct.%[17]s, 0),
 			tt.scnt,
 			tt.sw,
 			tt.sw0,
@@ -2175,6 +2285,7 @@ func (s *Storage) Db_GetSummaryTable(
 		storage.Tbl_countries,              // 14
 		storage.Fld_common_id_country,      // 15
 		storage.Fld_common_id_country+"_2", // 16
+		storage.Fld_common_id_base,         // 17
 	)
 
 	queryArgs := make([]any, 0, 80)
@@ -2234,6 +2345,7 @@ func (s *Storage) Db_GetSummaryTable(
 
 		if err = rows.Scan(
 			&row.TeamID,
+			&row.SportID,
 			&row.Games,
 			&row.Wins,
 			&sw0,
