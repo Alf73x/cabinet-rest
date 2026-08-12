@@ -576,6 +576,8 @@ type TblSeason struct {
 	Options1   string `json:"options_1"`
 	Options2   string `json:"options_2"`
 	IconIndex  int    `json:"icon_index"`
+	PlainText  string `json:"plainText"`
+	RemarkText string `json:"remarkText"`
 }
 
 type TblSport struct {
@@ -710,6 +712,8 @@ type TournamentInfo struct {
 	TableFormat int
 	Points
 	RoundStandings string
+	PlainText      string
+	RemarkText     string
 }
 
 type SeasonOptions struct {

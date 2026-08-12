@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 )
 
@@ -24,10 +23,6 @@ type IGetTeamMatches interface {
 func NewTeamMatches(log *slog.Logger, getTeamMatchesI IGetTeamMatches) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewTeamMatches"
-
-		log = log.With(slog.String("op", _FunctionName),
-			slog.String("request=id", middleware.GetReqID(r.Context())),
-		)
 
 		sIDTeam := r.URL.Query().Get(Url_Team_Matches_ID_Team)
 		if sIDTeam == "" {

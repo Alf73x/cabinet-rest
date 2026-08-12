@@ -125,11 +125,12 @@ func (s *Storage) Db_GetTerritories(parentID int) ([]storage.TblCountry, error) 
     	ELSE 0 END AS has_children,
 		IFNULL(%s,"")  /* sort_order */
 		FROM %s c 
-		WHERE IFNULL(c.%s, -1)=%d 
+		WHERE IFNULL(%s, 0) <> 1 AND IFNULL(c.%s, -1)=%d 
 		ORDER BY %s, %s`, storage.Fld_common_id, storage.Fld_common_name, storage.Tbl_countries, storage.Fld_countries_id_parent, storage.Fld_common_id,
 		storage.Fld_common_sort_order,
 		storage.Tbl_countries,
-		storage.Fld_countries_id_parent, parentID, storage.Fld_countries_sort_order, storage.Fld_common_name)
+		storage.Fld_common_private, storage.Fld_countries_id_parent,
+		parentID, storage.Fld_countries_sort_order, storage.Fld_common_name)
 
 	rows, err := s.db.Query(sSQL)
 	if err != nil {
@@ -169,9 +170,11 @@ func (s *Storage) Db_SearchTerritories(filter string) ([]storage.TblCountry, err
 	    0 AS has_children,
 		IFNULL(%s,"")  /* sort_order */
 		FROM %s c 
+		WHERE IFNULL(%s, 0) <> 1
 		ORDER BY %s, %s`, storage.Fld_common_id, storage.Fld_common_name,
 		storage.Fld_common_sort_order,
 		storage.Tbl_countries,
+		storage.Fld_common_private,
 		storage.Fld_countries_sort_order, storage.Fld_common_name)
 
 	rows, err := s.db.Query(sSQL)
@@ -289,15 +292,17 @@ func (s *Storage) Db_GetSeasons(idssport string, filterSeason string, filterName
 		IFNULL(%s,0),  /* sort_order */
 		IFNULL(%s,""), /* points */
 		IFNULL(%s,""), /* options_1 */
-		IFNULL(%s,"") , /* options_2 */
-		IFNULL(%s, 0) /* icon_index */
+		IFNULL(%s,""), /* options_2 */
+		IFNULL(%s, 0), /* icon_index */
+		IFNULL(%s,""), /* plain_text */
+        IFNULL(%s,"")  /* remark_text */
 		FROM %s  
-		WHERE 1=1 %s %s %s
+		WHERE IFNULL(%s, 0) <> 1 %s %s %s
 		ORDER BY %s DESC, %s`, storage.Fld_common_id, storage.Fld_class_season_season, storage.Fld_common_prefix, storage.Fld_common_name, storage.Fld_common_id_base,
 		storage.Fld_common_group_id, storage.Fld_class_season_league_rank, storage.Fld_common_sort_order,
-		storage.Fld_class_season_points, storage.Fld_class_season_options_1, storage.Fld_class_season_options_2, storage.Fld_common_icon_index,
+		storage.Fld_class_season_points, storage.Fld_class_season_options_1, storage.Fld_class_season_options_2, storage.Fld_common_icon_index, storage.Fld_class_season_plain_text, storage.Fld_class_season_remark_text,
 		storage.Tbl_class_season,
-		sports, seasonFilter, nameFilter,
+		storage.Fld_common_private, sports, seasonFilter, nameFilter,
 		storage.Fld_class_season_season, storage.Fld_common_sort_order,
 	)
 
@@ -322,7 +327,9 @@ func (s *Storage) Db_GetSeasons(idssport string, filterSeason string, filterName
 			&seas.Points,
 			&seas.Options1,
 			&seas.Options2,
-			&seas.IconIndex)
+			&seas.IconIndex,
+			&seas.PlainText,
+			&seas.RemarkText)
 		if err != nil {
 			return nil, err
 		}
@@ -415,7 +422,7 @@ func (s *Storage) Db_GetSports() ([]storage.TblSport, error) {
 }
 
 /*********************************************************************
-  Db_GetTeams
+  Db_GetTeams for selected territory
 **********************************************************************/
 
 func (s *Storage) Db_GetTeams(idTerritory int, idssport string) ([]storage.TblTeams, error) {
@@ -487,6 +494,12 @@ func (s *Storage) Db_GetTeams(idTerritory int, idssport string) ([]storage.TblTe
 		)
 		if err != nil {
 			return nil, err
+		}
+
+		if strings.Contains(strings.ToLower(team.Options), strings.ToLower(storage.KOptionsResultsOf)) {
+			if pos := strings.Index(team.SeasonName, "."); pos >= 0 {
+				team.SeasonName = strings.TrimSpace(team.SeasonName[:pos])
+			}
 		}
 		team.Place, err = s.GetPlaceAsStr(team.ID, team.StageIndex, team.Place)
 		leagueRank, err := strconv.Atoi(team.LeagueRank)
@@ -763,6 +776,8 @@ func (s *Storage) DB_GetSeasonVariables(id int) (ti storage.TournamentInfo, e er
 	info.IsOk = true
 	info.RoundStandings = roundStandings.String
 	info.TableFormat, info.Points = parseSeasonPoints(points.String)
+	info.PlainText = plainText.String
+	info.RemarkText = remark.String
 
 	return info, err
 }
@@ -1122,9 +1137,6 @@ func (s *Storage) ShowData_Cup(ids int) ([]storage.TournamentCup, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	if !rows.Next() {
-		return nil, nil
-	}
 
 	cup := []storage.TournamentCup{}
 

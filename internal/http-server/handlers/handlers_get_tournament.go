@@ -18,18 +18,24 @@ type ResponseTournament_Matrix struct {
 	ResultOf       int                        `json:"resultOf"`
 	Points         storage.Points             `json:"points"`
 	RoundStandings string                     `json:"roundStandings"`
+	InfoText       string                     `json:"infoText"`
+	CommentText    string                     `json:"commentText"`
 	Data           []storage.TournamentMatrix `json:"list"`
 }
 
 type ResponseTournament_Cup struct {
 	resp.Response
-	DataType int                     `json:"datatype"`
-	Data     []storage.TournamentCup `json:"list"`
+	DataType    int                     `json:"datatype"`
+	InfoText    string                  `json:"infoText"`
+	CommentText string                  `json:"commentText"`
+	Data        []storage.TournamentCup `json:"list"`
 }
 type ResponseTournament_PainText struct {
 	resp.Response
-	DataType int                           `json:"datatype"`
-	Data     []storage.TournamentPlainText `json:"list"`
+	DataType    int                           `json:"datatype"`
+	InfoText    string                        `json:"infoText"`
+	CommentText string                        `json:"commentText"`
+	Data        []storage.TournamentPlainText `json:"list"`
 }
 
 type IGetTournament_Matrix interface {
@@ -65,7 +71,7 @@ func NewTournament(log *slog.Logger, s *sqlite.Storage) http.HandlerFunc {
 				render.JSON(w, r, resp.Error(err.Error()))
 				return
 			}
-			responseTournamentPlainOK(w, r, plain)
+			responseTournamentPlainOK(w, r, plain, info)
 		} else if sqlite.Sport_IsTable(info.Rank) || info.ViewOpt == storage.KViewOption_Table || info.ResultOf > 0 {
 			matrix, info, err := s.ShowData_Table(id)
 			if err != nil {
@@ -81,7 +87,7 @@ func NewTournament(log *slog.Logger, s *sqlite.Storage) http.HandlerFunc {
 				render.JSON(w, r, resp.Error(err.Error()))
 				return
 			}
-			responseTournamentCupOK(w, r, cup)
+			responseTournamentCupOK(w, r, cup, info)
 		}
 
 	}
@@ -95,22 +101,27 @@ func responseTournamentMatrixOK(w http.ResponseWriter, r *http.Request, data []s
 		ResultOf:       info.ResultOf,
 		Points:         info.Points,
 		RoundStandings: info.RoundStandings,
+		InfoText:       info.PlainText,
+		CommentText:    info.RemarkText,
 		Data:           data,
 	})
 }
-
-func responseTournamentCupOK(w http.ResponseWriter, r *http.Request, data []storage.TournamentCup) {
+func responseTournamentCupOK(w http.ResponseWriter, r *http.Request, data []storage.TournamentCup, info storage.TournamentInfo,
+) {
 	render.JSON(w, r, ResponseTournament_Cup{
-		Response: resp.OK(),
-		DataType: 2,
-		Data:     data,
+		Response:    resp.OK(),
+		DataType:    2,
+		InfoText:    info.PlainText,
+		CommentText: info.RemarkText,
+		Data:        data,
 	})
 }
-
-func responseTournamentPlainOK(w http.ResponseWriter, r *http.Request, data []storage.TournamentPlainText) {
+func responseTournamentPlainOK(w http.ResponseWriter, r *http.Request, data []storage.TournamentPlainText, info storage.TournamentInfo) {
 	render.JSON(w, r, ResponseTournament_PainText{
-		Response: resp.OK(),
-		DataType: 3,
-		Data:     data,
+		Response:    resp.OK(),
+		DataType:    3,
+		InfoText:    info.PlainText,
+		CommentText: info.RemarkText,
+		Data:        data,
 	})
 }
