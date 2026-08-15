@@ -601,9 +601,9 @@ type TblTeams struct {
 	SportID       int
 	Season        string
 	SeasonName    string
+	SeasonID      int
 	TeamName      string
 	TeamTerritory string
-	TeamID        int
 	GroupID       int
 	LeagueRank    string
 	Place         string

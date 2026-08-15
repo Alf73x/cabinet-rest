@@ -53,31 +53,39 @@ func (s *Storage) Tree_FindTreeChildrenIDs(AiID int) string {
 	if !treeChildrenInitialized {
 		gListTree = gListTree[:0]
 
-		sSQL := "SELECT " + storage.Fld_common_id + "," + storage.Fld_countries_id_parent + "," + storage.Fld_countries_issues + "," + storage.Fld_countries_id_parent + "_2"
+		sSQL := "SELECT " + storage.Fld_common_id +
+			",IFNULL(" + storage.Fld_countries_id_parent + ",-1)" +
+			",IFNULL(" + storage.Fld_countries_issues + ",0)" +
+			",IFNULL(" + storage.Fld_countries_id_parent + "_2,-1)"
+
 		for i := 1; i <= storage.KSubIDsCount; i++ {
-			sSQL = sSQL + "," + storage.Fld_common_sub_id + "_" + strconv.Itoa(i)
+			sSQL = sSQL + ",IFNULL(" + storage.Fld_common_sub_id + "_" + strconv.Itoa(i) + ",-1)"
 		}
 		sSQL = sSQL + " FROM " + storage.Tbl_countries + " ORDER BY " + storage.Fld_countries_id_parent
 		rows, err := s.db.Query(sSQL)
 		if err == nil {
 			defer rows.Close()
+
 			for rows.Next() {
 				var t storage.TreeID
+
 				args := []any{
 					&t.ID,
 					&t.ParentID,
 					&t.Issues,
 					&t.SecondParentID,
 				}
+
 				for i := 0; i < storage.KSubIDsCount; i++ {
 					t.SubIDs[i] = -1
 					args = append(args, &t.SubIDs[i])
 				}
 
-				err := rows.Scan(args...)
-				if err != nil {
-					gListTree = append(gListTree, t)
+				if err := rows.Scan(args...); err != nil {
+					return "-1"
 				}
+
+				gListTree = append(gListTree, t)
 			}
 		}
 		treeChildrenInitialized = true

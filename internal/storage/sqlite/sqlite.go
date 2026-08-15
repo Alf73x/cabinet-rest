@@ -391,9 +391,10 @@ func (s *Storage) Db_GetSports() ([]storage.TblSport, error) {
 
 	sSQL := fmt.Sprintf(`SELECT %s, %s, %s  
 		FROM %s  
-		WHERE %s=1
-		ORDER BY %s`, storage.Fld_common_id, storage.Fld_common_name, storage.Fld_class_base_options, storage.Tbl_class_base, storage.Fld_class_base_available, storage.Fld_common_id)
-
+        WHERE %s=1 AND IFNULL(%s, '') NOT LIKE '%%Type=V%%' COLLATE NOCASE
+		ORDER BY %s`, storage.Fld_common_id, storage.Fld_common_name, storage.Fld_class_base_options,
+		storage.Tbl_class_base,
+		storage.Fld_class_base_available, storage.Fld_class_base_options, storage.Fld_common_id)
 	rows, err := s.db.Query(sSQL)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
@@ -433,13 +434,13 @@ func (s *Storage) Db_GetTeams(idTerritory int, idssport string) ([]storage.TblTe
 	sSQL = sSQL + "   SELECT id FROM " + storage.Tbl_class_team + " WHERE " + sFilter
 	sSQL = sSQL + ")"
 	sSQL = sSQL + " SELECT "
+	sSQL = sSQL + " tm." + storage.Fld_common_id + " teamid, "
 	sSQL = sSQL + " s." + storage.Fld_common_id + ", "
 	sSQL = sSQL + " s." + storage.Fld_common_id_base + ", "
 	sSQL = sSQL + " IFNULL(s." + storage.Fld_class_season_season + ", ''), "
 	sSQL = sSQL + " s." + storage.Fld_common_name + ", "
 	sSQL = sSQL + " tm." + storage.Fld_common_name + " team, "
 	sSQL = sSQL + " c." + storage.Fld_common_name + " ctr, "
-	sSQL = sSQL + " tm." + storage.Fld_common_id + " teamid, "
 	sSQL = sSQL + " IFNULL(s." + storage.Fld_common_group_id + ", 0) grp, "
 	sSQL = sSQL + " IFNULL(s." + storage.Fld_class_season_league_rank + ", 0), "
 	sSQL = sSQL + " IFNULL(t." + storage.Fld_common_sport_place + ", 0), "
@@ -472,12 +473,12 @@ func (s *Storage) Db_GetTeams(idTerritory int, idssport string) ([]storage.TblTe
 		var team storage.TblTeams
 		err := rows.Scan(
 			&team.ID,
+			&team.SeasonID,
 			&team.SportID,
 			&team.Season,
 			&team.SeasonName,
 			&team.TeamName,
 			&team.TeamTerritory,
-			&team.TeamID,
 			&team.GroupID,
 			&team.LeagueRank,
 			&team.Place,
@@ -501,7 +502,7 @@ func (s *Storage) Db_GetTeams(idTerritory int, idssport string) ([]storage.TblTe
 				team.SeasonName = strings.TrimSpace(team.SeasonName[:pos])
 			}
 		}
-		team.Place, err = s.GetPlaceAsStr(team.ID, team.StageIndex, team.Place)
+		team.Place, err = s.GetPlaceAsStr(team.SeasonID, team.StageIndex, team.Place)
 		leagueRank, err := strconv.Atoi(team.LeagueRank)
 		if err != nil {
 			leagueRank = 0
@@ -1246,7 +1247,8 @@ func (s *Storage) Db_GetTeam(id int) ([]storage.TblTeam, error) {
 	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_losses_et + ", 0), "
 	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_losses + ", 0), "
 	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_goals_for + ", 0), "
-	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_goals_against + ", 0) "
+	sSQL = sSQL + " IFNULL(t." + storage.Fld_sport_goals_against + ", 0), "
+	sSQL = sSQL + " IFNULL(s." + storage.Fld_class_season_options_1 + ", '') "
 	sSQL = sSQL + " FROM " + storage.Tbl_class_season + " s "
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_class_base + " b ON b." + storage.Fld_common_id + "=s." + storage.Fld_common_id_base
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_sport_tables + " t ON t." + storage.Fld_common_id_season + "=s." + storage.Fld_common_id + " AND t." + storage.Fld_common_id_team + " IN (" + sIDs + ")"
@@ -1266,6 +1268,7 @@ func (s *Storage) Db_GetTeam(id int) ([]storage.TblTeam, error) {
 		var team storage.TblTeam
 		var teamName string
 		var ctrName string
+		var seasonOptions string
 		err := rows.Scan(
 			&team.ID,
 			&teamName,
@@ -1283,17 +1286,26 @@ func (s *Storage) Db_GetTeam(id int) ([]storage.TblTeam, error) {
 			&team.Losses,
 			&team.Goals_For,
 			&team.Goals_Against,
+			&seasonOptions,
 		)
+
 		if err != nil {
 			return nil, err
 		}
 		team.Name = GetSportTeamName(teamName, ctrName)
-		team.Place, err = s.GetPlaceAsStr(team.ID, team.StageIndex, team.Place)
+		team.Place, err = s.GetPlaceAsStr(team.SeasonID, team.StageIndex, team.Place)
 		leagueRank, err := strconv.Atoi(team.LeagueRank)
 		if err != nil {
 			leagueRank = 0
 		}
 		team.LeagueRank = s.GetSportRankAsInt(leagueRank)
+
+		if strings.Contains(strings.ToLower(seasonOptions), strings.ToLower(storage.KOptionsResultsOf)) {
+			if pos := strings.Index(team.SeasonName, "."); pos >= 0 {
+				team.SeasonName = strings.TrimSpace(team.SeasonName[:pos])
+			}
+		}
+
 		list = append(list, team)
 	}
 	if err = rows.Err(); err != nil {
