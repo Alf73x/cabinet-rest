@@ -54,3 +54,7 @@ const Url_SummaryTables_LeagueRanks = "league_ranks"
 const Url_SummaryTables_YearFrom = "year_from"
 const Url_SummaryTables_YearTo = "year_to"
 const Url_SummaryTables_SportIDs = "sport_ids"
+
+const Url_SeasonInfo = "/api/v1/season_info" //  "/api/v1/season_info?id=2626"
+const Url_TeamInfo = "/api/v1/team_info"     //  "/api/v1/team_info?id=26"
+const Url_Info_ID = "id"

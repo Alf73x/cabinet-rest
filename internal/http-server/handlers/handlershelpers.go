@@ -29,6 +29,26 @@ func ParseSportIDs(value string) ([]int, error) {
 	return result, nil
 }
 
+func ParseLeagueRanks(value string) ([]int, error) {
+	if value == "" {
+		return nil, nil
+	}
+
+	parts := strings.Split(value, ",")
+	result := make([]int, 0, len(parts))
+
+	for _, part := range parts {
+		v, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || v < 0 {
+			return nil, fmt.Errorf("invalid league rank: %q", part)
+		}
+
+		result = append(result, v)
+	}
+
+	return result, nil
+}
+
 func SportIDsToString(ids []int) string {
 	if len(ids) == 0 {
 		return ""

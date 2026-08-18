@@ -43,7 +43,7 @@ func NewSummaryTable(log *slog.Logger, summaryTableI ISummaryTable) http.Handler
 		if leagueRanksText != "" {
 			var err error
 
-			leagueRanks, err = ParseSportIDs(leagueRanksText)
+			leagueRanks, err = ParseLeagueRanks(leagueRanksText)
 			if err != nil {
 				log.Error("invalid league_ranks", sl.Err(err))
 				render.Status(r, http.StatusBadRequest)

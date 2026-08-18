@@ -136,6 +136,10 @@ func main() {
 
 		r.Get(handlers.Url_SummaryCategories, handlers.NewSummaryCategories(log, storage))
 		r.Get(handlers.Url_SummaryTables, handlers.NewSummaryTable(log, storage))
+
+		r.Get(handlers.Url_SeasonInfo, handlers.NewSeasonInfo(log, storage))
+		r.Get(handlers.Url_TeamInfo, handlers.NewTeamInfo(log, storage))
+
 	})
 
 	// run server

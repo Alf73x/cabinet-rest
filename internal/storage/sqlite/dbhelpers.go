@@ -475,11 +475,12 @@ func (s *Storage) GetTeamTreeIDs(teamID int) ([]int, error) {
 	var getChildren func(id int) error
 
 	getChildren = func(id int) error {
-		rows, err := s.db.Query(`
-			SELECT id
-			FROM class_team
-			WHERE id_successor = ?
-		`, id)
+		rows, err := s.db.Query(
+			"SELECT "+storage.Fld_common_id+
+				" FROM "+storage.Tbl_class_team+
+				" WHERE "+storage.Fld_common_id_successor+" = ?",
+			id,
+		)
 		if err != nil {
 			return err
 		}

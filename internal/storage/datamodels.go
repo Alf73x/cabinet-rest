@@ -838,3 +838,19 @@ type TblSummaryTable struct {
 	Title string            `json:"title"`
 	Rows  []SummaryTableRow `json:"rows"`
 }
+
+type TeamInfo struct {
+	Id       int    `json:"id"`
+	Name     string `json:"name"`
+	DateFrom string `json:"dateFrom"`
+	DateTo   string `json:"dateTo"`
+}
+
+type SeasonInfo struct {
+	Points              string `json:"points"`
+	RankingDistribution string `json:"rankingDistribution"`
+}
+
+type TeamsInfo struct {
+	Teams []TeamInfo `json:"teams"`
+}

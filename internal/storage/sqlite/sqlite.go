@@ -2106,6 +2106,10 @@ func buildSummaryTableTitle(
 				leagueNames = append(leagueNames, "Чемпионат 3")
 			case 4:
 				leagueNames = append(leagueNames, "Чемпионат 4")
+			case 5:
+				leagueNames = append(leagueNames, "Чемпионат 5")
+			case 100:
+				leagueNames = append(leagueNames, "Кубок")
 			default:
 				leagueNames = append(leagueNames, strconv.Itoa(rank))
 			}
@@ -2421,4 +2425,136 @@ func (s *Storage) Db_GetSummaryTable(
 	)
 
 	return result, nil
+}
+
+/*
+SeasonInfo
+*/
+func (s *Storage) Db_GetSeasonInfo(id int) (storage.SeasonInfo, error) {
+	result := storage.SeasonInfo{}
+	const op = "storage.sqlite.Db_SeasonInfo"
+
+	sqlText := "SELECT IFNULL(" + storage.Fld_class_season_points + ", ''), " +
+		" IFNULL(" + storage.Fld_class_season_options_2 + ", '')" +
+		" FROM " + storage.Tbl_class_season +
+		" WHERE " + storage.Fld_common_id + "=" + strconv.Itoa(id)
+	rows, err := s.db.Query(sqlText)
+	if err != nil {
+		return result, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return result, nil
+	}
+
+	if err := rows.Scan(&result.Points, &result.RankingDistribution); err != nil {
+		return storage.SeasonInfo{}, err
+	}
+	return result, nil
+}
+
+/*
+TeamInfo
+*/
+func (s *Storage) Db_GetTeamInfo(id int) (storage.TeamsInfo, error) {
+	const op = "storage.sqlite.Db_GetTeamInfo"
+	result := storage.TeamsInfo{}
+
+	sl, err := s.GetTeamTreeIDs(id)
+	if err != nil {
+		return result, err
+	}
+
+	if len(sl) == 0 {
+		return result, nil
+	}
+
+	sIDs := ""
+	for i := 0; i < len(sl); i++ {
+		if sIDs != "" {
+			sIDs += ","
+		}
+		sIDs += strconv.Itoa(sl[i])
+	}
+
+	sqlText := "SELECT " +
+		"t." + storage.Fld_common_id + ", " +
+		"TRIM(t." + storage.Fld_common_name + " || ' ' || IFNULL(c." + storage.Fld_common_name + ", '')), " +
+		"IFNULL(t." + storage.Fld_common_founded_date + ", ''), " +
+		"IFNULL(t." + storage.Fld_common_disbanded_date + ", '') " +
+		"FROM " + storage.Tbl_class_team + " t " +
+		"LEFT JOIN " + storage.Tbl_countries + " c ON c." + storage.Fld_common_id + " = t." + storage.Fld_common_id_country +
+		" WHERE t." + storage.Fld_common_id + " IN (" + sIDs + ")"
+
+	rows, err := s.db.Query(sqlText)
+	if err != nil {
+		return result, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item storage.TeamInfo
+
+		if err := rows.Scan(
+			&item.Id,
+			&item.Name,
+			&item.DateFrom,
+			&item.DateTo,
+		); err != nil {
+			return result, err
+		}
+
+		slFrom := strings.Split(item.DateFrom, ",")
+		slTo := strings.Split(item.DateTo, ",")
+
+		for i := 0; i < len(slFrom); i++ {
+			newItem := storage.TeamInfo{
+				Id:       item.Id,
+				Name:     item.Name,
+				DateFrom: strings.TrimSpace(slFrom[i]),
+			}
+
+			if i < len(slTo) {
+				newItem.DateTo = strings.TrimSpace(slTo[i])
+			}
+
+			result.Teams = append(result.Teams, newItem)
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return result, err
+	}
+
+	sort.Slice(result.Teams, func(i, j int) bool {
+		return teamInfoDateSortValue(result.Teams[i].DateFrom) >
+			teamInfoDateSortValue(result.Teams[j].DateFrom)
+	})
+
+	return result, nil
+}
+
+func teamInfoDateSortValue(s string) int {
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, "?")
+
+	if s == "" || s == "?" {
+		return 0
+	}
+
+	sl := strings.Split(s, ".")
+
+	year, _ := strconv.Atoi(sl[0])
+	month := 0
+	day := 0
+
+	if len(sl) > 1 {
+		month, _ = strconv.Atoi(sl[1])
+	}
+	if len(sl) > 2 {
+		day, _ = strconv.Atoi(sl[2])
+	}
+
+	return year*10000 + month*100 + day
 }
