@@ -12,6 +12,7 @@ type Config struct {
 	Env string `yaml:"env" env-default:"local"`
 	// StoragePath string  `yaml:"storage_path" env-required:"true"`
 	StoragePath string
+	StorageKey  string
 	HTTPServer  `yaml:"http_server"`
 	JWT         JWT `yaml:"jwt"`
 }
@@ -48,5 +49,9 @@ func MustLoad() *Config {
 		log.Fatal("STORAGE_PATH is not set")
 	}
 
+	cfg.StorageKey = os.Getenv("SQLITE_KEY")
+	if cfg.StorageKey == "" {
+		log.Fatal("SQLITE_KEY is not set")
+	}
 	return &cfg
 }

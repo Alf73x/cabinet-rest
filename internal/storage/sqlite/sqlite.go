@@ -9,56 +9,40 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/mutecomm/go-sqlcipher/v4"
 )
 
 type Storage struct {
 	db *sql.DB
 }
 
-func New(storagePath string) (*Storage, error) {
+func New(storagePath, key string) (*Storage, error) {
 	const _FunctionName = "storage.sqlite.New"
-	db, err := sql.Open("sqlite", storagePath)
+
+	if key == "" {
+		return nil, fmt.Errorf("%s: database key is empty", _FunctionName)
+	}
+
+	dsn := storagePath + "?_pragma_key=" + url.QueryEscape(key)
+
+	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
 	}
-	/*
-		stmt, err := db.Prepare(`CREATE TABLE IF NOT EXISTS...`)
-		if err != nil {
-			return nil, fmt.Errorf("#{op}: #[err}")
-		}
-		_, err = stmt.Exec()
-		if err != nil {
-			return nil, fmt.Errorf("#{op}: #[err}")
-		}
-	*/
+
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master").Scan(&count); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("%s: cannot open encrypted database: %w", _FunctionName, err)
+	}
+
 	return &Storage{db: db}, nil
 }
-
-/*
-	func (s *Storage) SaveURL(urlToSave string, alias string) (int64, error) {
-		const op = "storage.sqlite.SaveURL"
-		stmt, err := s.db.Prepare(`INSERT INTO url (url, alias) VALUES(?, ?)`)
-		if err != nil {
-			return 0, fmt.Errorf("%s: %w", op, err)
-		}
-		res, err := stmt.Exec()
-		if err != nil {
-			//	if sqliteErr, ok := err.(sqlite.Error); ok && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
-			//			return 0, fmt.Errorf("%s: %w", op, storage.ErrURLExists)
-			//
-			//			}
-			return 0, fmt.Errorf("#{op}: #[err}")
-		}
-		id, err := res.LastInsertId()
-
-		return id, nil
-	}
-*/
 
 /*
 ********************************************************************
