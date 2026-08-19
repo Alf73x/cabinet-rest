@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -15,6 +16,15 @@ type Config struct {
 	StorageKey  string
 	HTTPServer  `yaml:"http_server"`
 	JWT         JWT `yaml:"jwt"`
+}
+
+func (c Config) String() string {
+	return fmt.Sprintf(
+		"{Env:%s StoragePath:%s SQLiteKey:*** HTTPServer:%+v}",
+		c.Env,
+		c.StoragePath,
+		c.HTTPServer,
+	)
 }
 
 type JWT struct {

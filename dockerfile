@@ -1,4 +1,4 @@
-FROM golang:1.26-alpine AS builder
+FROM golang:1.26-bookworm AS builder
 
 WORKDIR /app
 
@@ -7,9 +7,10 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o cabinet-rest ./cmd/server
+RUN CGO_ENABLED=1 go build -o cabinet-rest ./cmd/server
 
-FROM alpine:latest
+
+FROM debian:bookworm-slim
 
 WORKDIR /app
 

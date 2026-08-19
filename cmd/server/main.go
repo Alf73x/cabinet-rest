@@ -33,7 +33,7 @@ const (
 func main() {
 	// config: cleanenv
 	cfg := config.MustLoad()
-	fmt.Println(cfg)
+	fmt.Println(cfg.String())
 
 	// init logger: slog
 	log := setupLogger(cfg.Env)

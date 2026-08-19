@@ -35,6 +35,21 @@ func New(storagePath, key string) (*Storage, error) {
 		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
 	}
 
+	if _, err := db.Exec("PRAGMA cache_size = -65536"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("%s: cache_size: %w", _FunctionName, err)
+	}
+
+	if _, err := db.Exec("PRAGMA temp_store = MEMORY"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("%s: temp_store: %w", _FunctionName, err)
+	}
+
+	if _, err := db.Exec("PRAGMA mmap_size = 268435456"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("%s: mmap_size: %w", _FunctionName, err)
+	}
+
 	var count int
 	if err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master").Scan(&count); err != nil {
 		db.Close()

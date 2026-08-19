@@ -7,6 +7,7 @@ services:
       - "8082:8082"
     environment:
       CS_CONFIG_PATH: /app/config/local.yaml
-      STORAGE_PATH: /app/storage/cabinet.db
+      STORAGE_PATH: /app/storage/ecabinet.db
+      SQLITE_KEY: ${SQLITE_KEY}
     volumes:
       - ./storage:/app/storage
