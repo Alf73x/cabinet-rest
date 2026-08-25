@@ -33,7 +33,7 @@ const (
 func main() {
 	// config: cleanenv
 	cfg := config.MustLoad()
-	fmt.Println(cfg.String())
+	fmt.Println(cfg)
 
 	// init logger: slog
 	log := setupLogger(cfg.Env)
@@ -41,7 +41,7 @@ func main() {
 	log.Debug("debug messages are enabled")
 
 	// init storage: sqlite
-	storage, err := sqlite.New(cfg.StoragePath, cfg.StorageKey)
+	storage, err := sqlite.New(cfg.StoragePath)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
@@ -55,6 +55,7 @@ func main() {
 		AllowedOrigins: []string{
 			"http://localhost:5173",
 			"http://127.0.0.1:5173",
+			"http://192.168.7.149:5173",
 		},
 		AllowedMethods: []string{
 			"GET",

@@ -9,53 +9,23 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net/url"
 	"sort"
 	"strconv"
 	"strings"
 
-	_ "github.com/mutecomm/go-sqlcipher/v4"
+	_ "modernc.org/sqlite"
 )
 
 type Storage struct {
 	db *sql.DB
 }
 
-func New(storagePath, key string) (*Storage, error) {
+func New(storagePath string) (*Storage, error) {
 	const _FunctionName = "storage.sqlite.New"
-
-	if key == "" {
-		return nil, fmt.Errorf("%s: database key is empty", _FunctionName)
-	}
-
-	dsn := storagePath + "?_pragma_key=" + url.QueryEscape(key)
-
-	db, err := sql.Open("sqlite3", dsn)
+	db, err := sql.Open("sqlite", storagePath)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", _FunctionName, err)
 	}
-
-	if _, err := db.Exec("PRAGMA cache_size = -65536"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("%s: cache_size: %w", _FunctionName, err)
-	}
-
-	if _, err := db.Exec("PRAGMA temp_store = MEMORY"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("%s: temp_store: %w", _FunctionName, err)
-	}
-
-	if _, err := db.Exec("PRAGMA mmap_size = 268435456"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("%s: mmap_size: %w", _FunctionName, err)
-	}
-
-	var count int
-	if err := db.QueryRow("SELECT COUNT(*) FROM sqlite_master").Scan(&count); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("%s: cannot open encrypted database: %w", _FunctionName, err)
-	}
-
 	return &Storage{db: db}, nil
 }
 
