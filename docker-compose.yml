@@ -4,9 +4,9 @@ services:
     container_name: cabinet-rest
     restart: always
     ports:
-      - "8082:8082"
+       - "127.0.0.1:8082:8082"
     environment:
       CS_CONFIG_PATH: /app/config/local.yaml
-      STORAGE_PATH: /app/storage/ecabinet.db
+      STORAGE_PATH: /app/storage/cabinet.db
     volumes:
       - ./storage:/app/storage
