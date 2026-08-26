@@ -5,5 +5,5 @@ http_server:
   write_timeout: 60s  # send answer
   idle_timeout: 60s # connection with client 
 jwt:
-  secret: "hzfh4546425fd356e5hd"
+  secret: "change-me"
   ttl: 720h # 30 × 24 = 720 hours
