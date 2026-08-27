@@ -166,6 +166,81 @@ func nonEmptyStrings(values ...string) []string {
 	return result
 }
 
+type comparisonPair struct {
+	teamID1 int
+	teamID2 int
+}
+
+func (s *Storage) getComparisonCombinations(teamIDs1 []int, teamIDs2 []int) (map[comparisonPair]struct{}, error) {
+	const op = "storage.getComparisonCombinations"
+
+	result := make(map[comparisonPair]struct{})
+	if len(teamIDs1) == 0 || len(teamIDs2) == 0 {
+		return result, nil
+	}
+
+	makeValues := func(ids []int) string {
+		values := make([]string, 0, len(ids))
+		for _, id := range ids {
+			values = append(values, fmt.Sprintf("(%d)", id))
+		}
+
+		return strings.Join(values, ",")
+	}
+
+	sqlText := `
+		WITH id1(id) AS (
+			VALUES ` + makeValues(teamIDs1) + `
+		),
+		id2(id) AS (
+			VALUES ` + makeValues(teamIDs2) + `
+		)
+		SELECT
+			a.id,
+			b.id
+		FROM id1 a
+		CROSS JOIN id2 b
+		WHERE EXISTS (
+			SELECT 1
+			FROM ` + storage.Tbl_sport_results + ` r
+			WHERE r.` + storage.Fld_common_id_team_1 + ` = a.id
+			  AND r.` + storage.Fld_common_id_team_2 + ` = b.id
+
+			UNION ALL
+
+			SELECT 1
+			FROM ` + storage.Tbl_sport_results + ` r
+			WHERE r.` + storage.Fld_common_id_team_1 + ` = b.id
+			  AND r.` + storage.Fld_common_id_team_2 + ` = a.id
+		)
+	`
+
+	rows, err := s.db.Query(sqlText)
+	if err != nil {
+		return nil, fmt.Errorf("%s: query: %w", op, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id1, id2 int
+
+		if err := rows.Scan(&id1, &id2); err != nil {
+			return nil, fmt.Errorf("%s: scan: %w", op, err)
+		}
+
+		result[comparisonPair{
+			teamID1: id1,
+			teamID2: id2,
+		}] = struct{}{}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("%s: rows: %w", op, err)
+	}
+
+	return result, nil
+}
+
 /*
 ********************************************************************
 
@@ -175,31 +250,46 @@ func nonEmptyStrings(values ...string) []string {
 */
 
 func (s *Storage) Db_GetComparison(opponent1Type string, opponent1ID int, opponent2Type string, opponent2ID int, competitionFilter string, sportIDs []int, leagueRanks []int) (storage.TblComparison, error) {
+
 	const op = "storage.Db_GetComparison"
 
-	result := storage.TblComparison{
-		Data: make([]storage.ComparisonRow, 0),
-	}
+	result := storage.TblComparison{Data: make([]storage.ComparisonRow, 0)}
 
 	teamIDs1, err := s.getComparisonTeamIDs(opponent1Type, opponent1ID, sportIDs)
 	if err != nil {
 		return storage.TblComparison{}, fmt.Errorf("%s: resolve opponent 1: %w", op, err)
 	}
-
 	teamIDs2, err := s.getComparisonTeamIDs(opponent2Type, opponent2ID, sportIDs)
 	if err != nil {
 		return storage.TblComparison{}, fmt.Errorf("%s: resolve opponent 2: %w", op, err)
 	}
 
+	combinations, err := s.getComparisonCombinations(teamIDs1, teamIDs2)
+	if err != nil {
+		return storage.TblComparison{}, fmt.Errorf("%s: get combinations: %w", op, err)
+	}
+
 	for _, teamID1 := range teamIDs1 {
-		teamName1, err := s.GetTeamNameByID(teamID1)
-		if err != nil {
-			return storage.TblComparison{}, fmt.Errorf("%s: get team 1 name: %w", op, err)
-		}
+		var teamName1 string
+		teamName1Loaded := false
 
 		for _, teamID2 := range teamIDs2 {
 			if teamID1 == teamID2 {
 				continue
+			}
+
+			if _, ok := combinations[comparisonPair{teamID1: teamID1, teamID2: teamID2}]; !ok {
+				continue
+			}
+
+			// Get team 1 name only when it is actually needed.
+			if !teamName1Loaded {
+				var err error
+				teamName1, err = s.GetTeamNameByID(teamID1)
+				if err != nil {
+					return storage.TblComparison{}, fmt.Errorf("%s: get team 1 name: %w", op, err)
+				}
+				teamName1Loaded = true
 			}
 
 			teamName2, err := s.GetTeamNameByID(teamID2)
@@ -223,6 +313,7 @@ func (s *Storage) Db_GetComparison(opponent1Type string, opponent1ID int, oppone
 
 	return result, nil
 }
+
 func (s *Storage) getComparisonTeamIDs(opponentType string, opponentID int, sportIDs []int) ([]int, error) {
 	switch opponentType {
 	case "territory":
