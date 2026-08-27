@@ -124,7 +124,7 @@ func buildSummaryTableTitle(
 				leagueNames = append(leagueNames, "Чемпионат 4")
 			case 5:
 				leagueNames = append(leagueNames, "Чемпионат 5")
-			case 100:
+			case 0:
 				leagueNames = append(leagueNames, "Кубок")
 			default:
 				leagueNames = append(leagueNames, strconv.Itoa(rank))

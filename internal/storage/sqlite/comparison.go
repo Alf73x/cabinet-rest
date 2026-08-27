@@ -277,7 +277,7 @@ func (s *Storage) getComparisonTeamIDs(opponentType string, opponentID int, spor
 		return teamIDs, nil
 
 	case "team":
-		return []int{opponentID}, nil
+		return s.GetTeamTreeIDs(opponentID)
 
 	default:
 		return nil, fmt.Errorf("unknown opponent type %q", opponentType)
