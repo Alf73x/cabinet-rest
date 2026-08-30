@@ -54,6 +54,12 @@ func NewLogin(log *slog.Logger, userProvider UserProvider, tokenService *auth.To
 			return
 		}
 
+		// Check password
+		if !CheckPassword(user.PasswordHash, req.Password) {
+			writeInvalidCredentials(w)
+			return
+		}
+
 		token, expiresAt, err := tokenService.CreateToken(user.ID, user.LoginName)
 		if err != nil {
 			log.Error("failed to create JWT", slog.String("error", err.Error()))

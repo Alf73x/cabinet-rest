@@ -179,7 +179,7 @@ func main() {
 	/*
 		Защищённый маршрут.
 
-		appmiddleware.JWT(tokenService) выполняется до вызова handler.
+		appmiddleware.JWT(tokenService, storage) выполняется до вызова handler.
 
 		Если Authorization отсутствует
 		или JWT некорректен:
@@ -189,9 +189,9 @@ func main() {
 			-> claims сохраняются в context;
 			-> handler NewMe получает доступ к текущему пользователю.
 	*/
-	router.With(appmiddleware.JWT(tokenService)).Get(handlers.Url_Me, auth.NewMe(log, storage))
+	router.With(appmiddleware.JWT(tokenService, storage)).Get(handlers.Url_Me, auth.NewMe(log, storage))
 	/* Пример ещё одного защищённого маршрута.
-	router.With(appmiddleware.JWT(tokenService)).Get(
+	router.With(appmiddleware.JWT(tokenService, storage)).Get(
 		handlers.Url_Comparison,
 		handlers.NewComparison(log, storage),
 	)

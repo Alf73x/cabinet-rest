@@ -12,6 +12,10 @@ import (
 
 type contextKey string // Создаётся собственный тип для ключей context.
 
+type UserStatusProvider interface {
+	IsUserEnabled(ctx context.Context, userID int64) (bool, error)
+}
+
 const claimsContextKey contextKey = "jwtClaims" // Это ключ, по которому JWT-данные будут храниться внутри context. Значение собственного типа уменьшает риск случайного совпадения ключей из разных пакетов.
 
 /*
@@ -108,7 +112,7 @@ auth.NewMe
 
 JSON Response
 */
-func JWT(tokenService *jwtservice.TokenService) func(http.Handler) http.Handler { // Принимает tokenService, который умеет проверять и разбирать токен. Возвращает middleware стандартного вида.
+func JWT(tokenService *jwtservice.TokenService, userStatusProvider UserStatusProvider) func(http.Handler) http.Handler { // Принимает tokenService, который умеет проверять и разбирать токен. Возвращает middleware стандартного вида.
 	return func(next http.Handler) http.Handler { // next — это handler, который должен выполниться после успешной проверки JWT.
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { // Именно эта функция будет выполняться при запросе.
 			claims, err := parseClaims(r, tokenService) // Общая функция читает Authorization, извлекает токен, проверяет его и возвращает claims.
@@ -130,6 +134,16 @@ func JWT(tokenService *jwtservice.TokenService) func(http.Handler) http.Handler 
 
 			if err != nil {
 				writeJSONError(w, http.StatusUnauthorized, "invalid token")
+				return
+			}
+
+			enabled, err := userStatusProvider.IsUserEnabled(r.Context(), claims.UserID)
+			if err != nil {
+				writeJSONError(w, http.StatusInternalServerError, "internal server error")
+				return
+			}
+			if !enabled {
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 

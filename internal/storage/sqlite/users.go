@@ -57,3 +57,23 @@ func (s *Storage) GetUserByLogin(ctx context.Context, loginName string) (auth.Us
 	user.Enabled = enabled != 0
 	return user, nil
 }
+
+func (s *Storage) IsUserEnabled(ctx context.Context, userID int64) (bool, error) {
+	query := fmt.Sprintf(
+		`SELECT EXISTS (
+			SELECT 1
+			FROM %s
+			WHERE %s = ? AND %s <> 0
+		)`,
+		storage.Tbl_user_management_users,
+		storage.Fld_common_id,
+		storage.Fld_user_management_enabled,
+	)
+
+	var enabled bool
+	if err := s.db.QueryRowContext(ctx, query, userID).Scan(&enabled); err != nil {
+		return false, fmt.Errorf("check user %d status: %w", userID, err)
+	}
+
+	return enabled, nil
+}
