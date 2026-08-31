@@ -90,5 +90,21 @@ jobs:
           ssh -i ~/.ssh/id_ed25519 "$VPS_USER@$VPS_HOST" "
             cd /root/Programs/CabinetREST &&
             docker compose pull &&
-            docker compose up -d
+            docker compose up -d &&
+
+            echo 'Waiting for REST...' &&
+
+            for i in \$(seq 1 15); do
+              if curl -fsS http://127.0.0.1:8082/health > /dev/null; then
+                echo 'REST health check OK'
+                exit 0
+              fi
+
+              echo 'REST is not ready yet...'
+              sleep 2
+            done
+
+            echo 'REST health check FAILED'
+            docker logs --tail 100 cabinet-rest
+            exit 1
           "
