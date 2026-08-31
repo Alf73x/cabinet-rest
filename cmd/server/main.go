@@ -241,6 +241,10 @@ func main() {
 		r.Get(handlers.Url_SeasonInfo, handlers.NewSeasonInfo(log, storage))
 		r.Get(handlers.Url_TeamInfo, handlers.NewTeamInfo(log, storage))
 
+		r.Get(handlers.Url_Health, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		})
 	})
 
 	/*

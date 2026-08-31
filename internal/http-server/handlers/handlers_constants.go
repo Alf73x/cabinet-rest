@@ -58,3 +58,5 @@ const Url_SummaryTables_SportIDs = "sport_ids"
 const Url_SeasonInfo = "/api/v1/season_info" //  "/api/v1/season_info?id=2626"
 const Url_TeamInfo = "/api/v1/team_info"     //  "/api/v1/team_info?id=26"
 const Url_Info_ID = "id"
+
+const Url_Health = "/health"

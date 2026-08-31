@@ -20,28 +20,16 @@ type ISummaryCategories interface {
 	Db_GetSummaryCategories() (storage.TblSummaryCategories, error)
 }
 
-func NewSummaryCategories(
-	log *slog.Logger,
-	summaryCategoriesI ISummaryCategories,
-) http.HandlerFunc {
+func NewSummaryCategories(log *slog.Logger, summaryCategoriesI ISummaryCategories) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewSummaryCategories"
-
-		log = log.With(
-			slog.String("op", _FunctionName),
-			slog.String("request_id", middleware.GetReqID(r.Context())),
-		)
-
+		log = log.With(slog.String("op", _FunctionName), slog.String("request_id", middleware.GetReqID(r.Context())))
 		categories, err := summaryCategoriesI.Db_GetSummaryCategories()
 		if err != nil {
 			log.Error("failed to load summary categories", sl.Err(err))
 
 			render.Status(r, http.StatusInternalServerError)
-			render.JSON(
-				w,
-				r,
-				resp.Error("failed to load summary categories"),
-			)
+			render.JSON(w, r, resp.Error("failed to load summary categories"))
 			return
 		}
 
