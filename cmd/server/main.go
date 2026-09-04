@@ -247,6 +247,16 @@ func main() {
 		r.Get(handlers.Url_TeamInfo, handlers.NewTeamInfo(log, storage))
 
 		r.Get(handlers.Url_Health, func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			defer cancel()
+
+			if err := storage.Ping(ctx); err != nil {
+				log.Error("health check failed", sl.Err(err))
+				http.Error(w, "database unavailable", http.StatusServiceUnavailable)
+				return
+			}
+
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("ok"))
 		})
@@ -288,22 +298,28 @@ func main() {
 		Это нужно потому, что ListenAndServe блокирует поток. Основная goroutine ниже должна продолжить работу и ждать сигнал завершения приложения.
 	*/
 
+	serverErr := make(chan error, 1)
+
 	go func() {
 		if err := srv.ListenAndServe(); err != nil &&
 			err != http.ErrServerClosed {
-
-			log.Error(
-				"failed to start server",
-				sl.Err(err),
-			)
+			serverErr <- err
 		}
 	}()
 
 	/*
 		Блокируем main goroutine до тех пор, пока ОС не пришлёт сигнал завершения.
 	*/
-	<-done
-	log.Info("stopping server")
+	select {
+	case <-done:
+		log.Info("stopping server")
+	case err := <-serverErr:
+		log.Error("server stopped unexpectedly", sl.Err(err))
+		if closeErr := storage.Close(); closeErr != nil {
+			log.Error("failed to close storage", sl.Err(closeErr))
+		}
+		os.Exit(1)
+	}
 
 	/*
 		Graceful shutdown.
