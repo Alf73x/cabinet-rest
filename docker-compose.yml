@@ -1,6 +1,6 @@
 services:
   cabinet-rest:
-    image: ghcr.io/alf73x/cabinet-rest:latest
+    image: ghcr.io/alf73x/cabinet-rest:${IMAGE_TAG:-latest}
 
     container_name: cabinet-rest
 
@@ -15,3 +15,4 @@ services:
 
     volumes:
       - ./storage:/app/storage
+      - ./config/local.yaml:/app/config/local.yaml:ro

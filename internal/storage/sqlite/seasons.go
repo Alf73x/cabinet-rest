@@ -163,7 +163,8 @@ func (s *Storage) DB_GetSeasonVariables(id int) (ti storage.TournamentInfo, e er
 	FROM ` + storage.Tbl_class_season + ` s
 	LEFT JOIN ` + storage.Tbl_class_base + ` b
 	ON s.` + storage.Fld_common_id_base + ` = b.` + storage.Fld_common_id + `
-	WHERE s.` + storage.Fld_common_id + ` = ?`
+	WHERE s.` + storage.Fld_common_id + ` = ?
+	AND IFNULL(s.` + storage.Fld_common_private + `, 0) <> 1`
 
 	var (
 		name           sql.NullString

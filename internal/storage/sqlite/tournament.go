@@ -87,10 +87,8 @@ func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentM
 			IFNULL(t.` + storage.Fld_sport_away_goals_for + `, 0),
 			IFNULL(t.` + storage.Fld_sport_away_goals_against + `, 0)
 		FROM ` + storage.Tbl_sport_tables + ` t
-		LEFT JOIN ` + storage.Tbl_class_team + ` ct
-			ON ct.` + storage.Fld_common_id + ` = t.` + storage.Fld_common_id_team + `
-		LEFT JOIN ` + storage.Tbl_countries + ` cou
-			ON cou.` + storage.Fld_common_id + ` = ct.` + storage.Fld_common_id_country + `
+		LEFT JOIN ` + storage.Tbl_class_team + ` ct ON ct.` + storage.Fld_common_id + ` = t.` + storage.Fld_common_id_team + `
+		LEFT JOIN ` + storage.Tbl_countries + ` cou ON cou.` + storage.Fld_common_id + ` = ct.` + storage.Fld_common_id_country + `
 		WHERE t.` + storage.Fld_common_id_season + ` = ?
 		ORDER BY t.` + storage.Fld_common_sport_place
 

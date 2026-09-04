@@ -172,7 +172,7 @@ func (s *Storage) Db_GetTeam(id int) ([]storage.TblTeam, error) {
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_sport_tables + " t ON t." + storage.Fld_common_id_season + "=s." + storage.Fld_common_id + " AND t." + storage.Fld_common_id_team + " IN (" + sIDs + ")"
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_class_team + " tm ON tm." + storage.Fld_common_id + "=t." + storage.Fld_common_id_team
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_countries + " c ON c." + storage.Fld_common_id + "=tm." + storage.Fld_common_id_country
-	sSQL = sSQL + " WHERE tm." + storage.Fld_common_id + " IN (" + sIDs + ") "
+	sSQL = sSQL + " WHERE tm." + storage.Fld_common_id + " IN (" + sIDs + ") AND IFNULL(s." + storage.Fld_common_private + ", 0) <> 1 AND IFNULL(tm." + storage.Fld_common_private + ", 0) <> 1  "
 	sSQL = sSQL + " ORDER BY " + storage.Fld_class_season_season + " DESC, s." + storage.Fld_common_sort_order + " DESC "
 
 	rows, err := s.db.Query(sSQL)
