@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"CabinetREST/internal/storage"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -11,10 +12,17 @@ import (
 **********************************************************************/
 
 func (s *Storage) Db_GetTeamMatches(idTeam int, idSeason int) ([]storage.TblTeamMatches, error) {
-	const _FunctionName = "storage.sqlite.Db_GetTeams"
+	const functionName = "storage.sqlite.Db_GetTeamMatches"
 	var teamMatches []storage.TblTeamMatches
 
 	sl, err := s.GetTeamTreeIDs(idTeam)
+	if err != nil {
+		return nil, fmt.Errorf("%s: get team tree: %w", functionName, err)
+	}
+	if len(sl) == 0 {
+		return []storage.TblTeamMatches{}, nil
+	}
+
 	var sIDs string
 	for i := 0; i < len(sl); i++ {
 		if sIDs != "" {
@@ -41,7 +49,7 @@ func (s *Storage) Db_GetTeamMatches(idTeam int, idSeason int) ([]storage.TblTeam
 	}
 	defer rows.Close()
 	if !rows.Next() {
-		return nil, err
+		return []storage.TblTeamMatches{}, nil
 	}
 
 	var sOpt string

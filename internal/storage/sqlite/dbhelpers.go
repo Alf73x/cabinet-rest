@@ -686,7 +686,7 @@ func GetSportScoreColor(mask int, defaultColor string, isDarkSkin bool) string {
 	return defaultColor
 }
 
-func GetScoresResult(result_type, scored, scored_et, missed, missed_et int) int {
+func GetScoresResult(resultType, scored, scoredET, missed, missedET int) int {
 	result := kDraw
 
 	if scored > missed {
@@ -694,19 +694,19 @@ func GetScoresResult(result_type, scored, scored_et, missed, missed_et int) int 
 	} else if scored < missed {
 		result = kLoose
 	} else {
-		if result_type == storage.RtScorePlusMinus {
+		if resultType == storage.RtScorePlusMinus {
 			result = kWin
-		} else if result_type == storage.RtScoreMinusPlus {
+		} else if resultType == storage.RtScoreMinusPlus {
 			result = kLoose
-		} else if result_type == storage.RtScoreMinusMinus {
+		} else if resultType == storage.RtScoreMinusMinus {
 			result = kDraw
-		} else if result_type > missed_et {
+		} else if scoredET > missedET {
 			result = kWinET
-		} else if result_type < missed_et {
+		} else if scoredET < missedET {
 			result = kLooseET
-		} else if result_type == storage.RtScoreWL {
+		} else if resultType == storage.RtScoreWL {
 			result = kWin
-		} else if result_type == storage.RtScoreLW {
+		} else if resultType == storage.RtScoreLW {
 			result = kLoose
 		}
 	}

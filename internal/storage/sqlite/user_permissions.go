@@ -34,7 +34,7 @@ func (s *Storage) GetUserPermissions(ctx context.Context, userID int64) ([]strin
 	}
 	defer rows.Close()
 
-	permissions := make([]string, 16)
+	permissions := make([]string, 0, 16)
 	for rows.Next() {
 		var permission string
 

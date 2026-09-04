@@ -6,4 +6,4 @@ http_server:
   idle_timeout: 60s # connection with client 
 jwt:
   secret: "change-me"
-  ttl: 720h # 30 × 24 = 720 hours
+  ttl: 24h

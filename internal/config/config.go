@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/numbergroup/cleanenv"
@@ -28,6 +30,11 @@ type HTTPServer struct {
 	IdleTimeout  time.Duration `yaml:"idle_timeout" env-default:"60s"`
 }
 
+const (
+	minJWTSecretBytes = 32
+	maxJWTTTL         = 24 * time.Hour
+)
+
 func MustLoad() *Config {
 	configPath := os.Getenv("CS_CONFIG_PATH")
 	if configPath == "" {
@@ -47,6 +54,35 @@ func MustLoad() *Config {
 	if cfg.StoragePath == "" {
 		log.Fatal("STORAGE_PATH is not set")
 	}
+	if err := validate(&cfg); err != nil {
+		log.Fatalf("invalid configuration: %s", err)
+	}
 
 	return &cfg
+}
+
+func validate(cfg *Config) error {
+	secret := cfg.JWT.Secret
+	trimmedSecret := strings.TrimSpace(secret)
+
+	if trimmedSecret == "" {
+		return fmt.Errorf("JWT secret is empty")
+	}
+	if secret != trimmedSecret {
+		return fmt.Errorf("JWT secret must not have leading or trailing whitespace")
+	}
+	if strings.EqualFold(secret, "change-me") {
+		return fmt.Errorf("default JWT secret must be replaced")
+	}
+	if len([]byte(secret)) < minJWTSecretBytes {
+		return fmt.Errorf("JWT secret must contain at least %d bytes", minJWTSecretBytes)
+	}
+	if cfg.JWT.TTL <= 0 {
+		return fmt.Errorf("JWT TTL must be positive")
+	}
+	if cfg.JWT.TTL > maxJWTTTL {
+		return fmt.Errorf("JWT TTL must not exceed %s", maxJWTTTL)
+	}
+
+	return nil
 }
