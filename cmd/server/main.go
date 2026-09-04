@@ -107,6 +107,11 @@ func main() {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
 	}
+	defer func() {
+		if err := storage.Close(); err != nil {
+			log.Error("failed to close storage", sl.Err(err))
+		}
+	}()
 
 	/*
 		Создаём сервис JWT.
@@ -313,8 +318,6 @@ func main() {
 
 		return
 	}
-
-	// TODO: close storage
 
 	log.Info("server stopped")
 }
