@@ -25,14 +25,14 @@ func NewTeams(log *slog.Logger, getTeamsI IGetTeams) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewTeams"
 
-		log = log.With(slog.String("op", _FunctionName),
-			slog.String("request=id", middleware.GetReqID(r.Context())),
+		requestLog := log.With(slog.String("op", _FunctionName),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
 		sTerritoryID := r.URL.Query().Get(Url_Teams_ID_Territory)
 		if sTerritoryID == "" {
 			s := Url_Teams_ID_Territory + " is empty"
-			log.Info(s)
+			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
 			return
 
@@ -40,14 +40,14 @@ func NewTeams(log *slog.Logger, getTeamsI IGetTeams) http.HandlerFunc {
 		idTerritory, err := strconv.Atoi(sTerritoryID)
 		if err != nil {
 			s := Url_Teams_ID_Territory + " must be integer"
-			log.Info(s)
+			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
 			return
 		}
 
 		idsSport, err := ParseSportIDs(r.URL.Query().Get("sport_ids"))
 		if err != nil {
-			log.Error(err.Error(), sl.Err(err))
+			requestLog.Error(err.Error(), sl.Err(err))
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
 		}
@@ -55,7 +55,7 @@ func NewTeams(log *slog.Logger, getTeamsI IGetTeams) http.HandlerFunc {
 
 		listTeams, err := getTeamsI.Db_GetTeams(idTerritory, strIdsSport)
 		if err != nil {
-			log.Error("failed to load teams", sl.Err(err))
+			requestLog.Error("failed to load teams", sl.Err(err))
 			render.JSON(w, r, resp.Error("failed to load teams"))
 			return
 		}

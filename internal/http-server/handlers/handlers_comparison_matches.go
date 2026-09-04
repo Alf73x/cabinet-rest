@@ -25,7 +25,7 @@ func NewComparisonMatches(log *slog.Logger, comparisonMatchesI IComparisonMatche
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewComparisonMatches"
 
-		log = log.With(
+		requestLog := log.With(
 			slog.String("op", _FunctionName),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
@@ -34,7 +34,7 @@ func NewComparisonMatches(log *slog.Logger, comparisonMatchesI IComparisonMatche
 		if err != nil || team1ID <= 0 {
 			err := errInvalidComparisonParameter(Url_ComparisonMatches_Team1ID)
 
-			log.Error(err.Error(), sl.Err(err))
+			requestLog.Error(err.Error(), sl.Err(err))
 			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
@@ -44,7 +44,7 @@ func NewComparisonMatches(log *slog.Logger, comparisonMatchesI IComparisonMatche
 		if err != nil || team2ID <= 0 {
 			err := errInvalidComparisonParameter(Url_ComparisonMatches_Team2ID)
 
-			log.Error(err.Error(), sl.Err(err))
+			requestLog.Error(err.Error(), sl.Err(err))
 			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
@@ -52,7 +52,7 @@ func NewComparisonMatches(log *slog.Logger, comparisonMatchesI IComparisonMatche
 
 		matches, err := comparisonMatchesI.Db_GetComparisonMatches(team1ID, team2ID)
 		if err != nil {
-			log.Error("failed to load comparison matches", sl.Err(err))
+			requestLog.Error("failed to load comparison matches", sl.Err(err))
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, resp.Error("failed to load comparison matches"))
 			return

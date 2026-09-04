@@ -90,6 +90,8 @@ func (s *Storage) loadTournamentMatrixTeams(idSeason int) ([]storage.TournamentM
 		LEFT JOIN ` + storage.Tbl_class_team + ` ct ON ct.` + storage.Fld_common_id + ` = t.` + storage.Fld_common_id_team + `
 		LEFT JOIN ` + storage.Tbl_countries + ` cou ON cou.` + storage.Fld_common_id + ` = ct.` + storage.Fld_common_id_country + `
 		WHERE t.` + storage.Fld_common_id_season + ` = ?
+		  AND IFNULL(ct.` + storage.Fld_common_private + `, 0) <> 1
+		  AND IFNULL(cou.` + storage.Fld_common_private + `, 0) <> 1
 		ORDER BY t.` + storage.Fld_common_sport_place
 
 	rows, err := s.db.Query(sqlText, idSeason)
@@ -244,11 +246,19 @@ func (s *Storage) loadTournamentMatrixMatches(idSeason int) ([]storage.Tournamen
 			IFNULL(` + storage.Fld_sport_missed_et + `, 0),
 			IFNULL(` + storage.Fld_sport_tour + `, 0),
 			IFNULL(` + storage.Fld_common_date + `, '')
-		FROM ` + storage.Tbl_sport_results + `
-		WHERE ` + storage.Fld_common_id_season + ` = ?
-		ORDER BY ` + storage.Fld_common_id_team_1 + `,
-				` + storage.Fld_common_id_team_2 + `,
-				` + storage.Fld_common_date
+		FROM ` + storage.Tbl_sport_results + ` r
+		JOIN ` + storage.Tbl_class_team + ` t1 ON t1.` + storage.Fld_common_id + ` = r.` + storage.Fld_common_id_team_1 + `
+		JOIN ` + storage.Tbl_class_team + ` t2 ON t2.` + storage.Fld_common_id + ` = r.` + storage.Fld_common_id_team_2 + `
+		LEFT JOIN ` + storage.Tbl_countries + ` c1 ON c1.` + storage.Fld_common_id + ` = t1.` + storage.Fld_common_id_country + `
+		LEFT JOIN ` + storage.Tbl_countries + ` c2 ON c2.` + storage.Fld_common_id + ` = t2.` + storage.Fld_common_id_country + `
+		WHERE r.` + storage.Fld_common_id_season + ` = ?
+		  AND IFNULL(t1.` + storage.Fld_common_private + `, 0) <> 1
+		  AND IFNULL(t2.` + storage.Fld_common_private + `, 0) <> 1
+		  AND IFNULL(c1.` + storage.Fld_common_private + `, 0) <> 1
+		  AND IFNULL(c2.` + storage.Fld_common_private + `, 0) <> 1
+		ORDER BY r.` + storage.Fld_common_id_team_1 + `,
+				r.` + storage.Fld_common_id_team_2 + `,
+				r.` + storage.Fld_common_date
 
 	rows, err := s.db.Query(sqlText, idSeason)
 	if err != nil {
@@ -321,7 +331,7 @@ func (s *Storage) ShowData_Cup(ids int) ([]storage.TournamentCup, error) {
 
 	sSQL := "SELECT  IFNULL(" + storage.Fld_common_winner_id + ",-1) "
 	sSQL += " FROM " + storage.Tbl_class_season
-	sSQL += " WHERE " + storage.Fld_common_id + "=?"
+	sSQL += " WHERE " + storage.Fld_common_id + "=? AND IFNULL(" + storage.Fld_common_private + ", 0) <> 1"
 	err := s.db.QueryRow(sSQL, ids).Scan(&idCupWinner)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
@@ -354,7 +364,12 @@ func (s *Storage) ShowData_Cup(ids int) ([]storage.TournamentCup, error) {
 	sSQL += "LEFT JOIN " + storage.Tbl_countries + " cou2 ON cou2." + storage.Fld_common_id + "=ct2." + storage.Fld_common_id_country + " "
 	sSQL += "LEFT JOIN " + storage.Tbl_class_season + " seas ON seas." + storage.Fld_common_id + "=r." + storage.Fld_common_id_season + " "
 	//sSQL += "LEFT JOIN " + storage.Tbl_class_base + " bs ON bs." + storage.Fld_common_id + "=seas." + storage.Fld_common_id_base + " "
-	sSQL += "WHERE r." + storage.Fld_common_id_season + "=?"
+	sSQL += "WHERE r." + storage.Fld_common_id_season + "=? "
+	sSQL += "AND IFNULL(seas." + storage.Fld_common_private + ", 0) <> 1 "
+	sSQL += "AND IFNULL(ct1." + storage.Fld_common_private + ", 0) <> 1 "
+	sSQL += "AND IFNULL(ct2." + storage.Fld_common_private + ", 0) <> 1 "
+	sSQL += "AND IFNULL(cou1." + storage.Fld_common_private + ", 0) <> 1 "
+	sSQL += "AND IFNULL(cou2." + storage.Fld_common_private + ", 0) <> 1"
 	rows, err := s.db.Query(sSQL, ids)
 	if err != nil {
 		return nil, err
@@ -426,7 +441,7 @@ func (s *Storage) ShowDataPlain(ids int) ([]storage.TournamentPlainText, error) 
 	sSQL := " SELECT "
 	sSQL = sSQL + " IFNULL(" + storage.Fld_common_text + ", '')"
 	sSQL = sSQL + " FROM " + storage.Tbl_class_season
-	sSQL = sSQL + " WHERE " + storage.Fld_common_id + "=?"
+	sSQL = sSQL + " WHERE " + storage.Fld_common_id + "=? AND IFNULL(" + storage.Fld_common_private + ", 0) <> 1"
 	var txt string
 	err := s.db.QueryRow(sSQL, ids).Scan(&txt)
 	if err != nil {

@@ -12,19 +12,30 @@ import (
 
 func (s *Storage) Db_GetTerritories(parentID int) ([]storage.TblCountry, error) {
 	const _FunctionName = "storage.sqlite.Db_GetCountries"
+	if parentID > 0 {
+		var parentIsPublic bool
+		query := "SELECT EXISTS (SELECT 1 FROM " + storage.Tbl_countries +
+			" WHERE " + storage.Fld_common_id + "=? AND IFNULL(" + storage.Fld_common_private + ", 0) <> 1)"
+		if err := s.db.QueryRow(query, parentID).Scan(&parentIsPublic); err != nil {
+			return nil, fmt.Errorf("%s: check parent: %w", _FunctionName, err)
+		}
+		if !parentIsPublic {
+			return []storage.TblCountry{}, nil
+		}
+	}
 
 	if parentID <= 0 {
 		parentID = -1
 	}
 
 	sSQL := fmt.Sprintf(`SELECT c.%s, c.%s, 
-	    CASE WHEN EXISTS (SELECT 1 FROM %s c2 WHERE c2.%s = c.%s) THEN 1
+	    CASE WHEN EXISTS (SELECT 1 FROM %s c2 WHERE c2.%s = c.%s AND IFNULL(c2.%s, 0) <> 1) THEN 1
     	ELSE 0 END AS has_children,
 		IFNULL(%s,"")  /* sort_order */
 		FROM %s c 
 		WHERE IFNULL(%s, 0) <> 1 AND IFNULL(c.%s, -1)=%d 
 		ORDER BY %s, %s`, storage.Fld_common_id, storage.Fld_common_name, storage.Tbl_countries, storage.Fld_countries_id_parent, storage.Fld_common_id,
-		storage.Fld_common_sort_order,
+		storage.Fld_common_private, storage.Fld_common_sort_order,
 		storage.Tbl_countries,
 		storage.Fld_common_private, storage.Fld_countries_id_parent,
 		parentID, storage.Fld_countries_sort_order, storage.Fld_common_name)
@@ -115,15 +126,16 @@ func (s *Storage) Db_PathTerritories(id int) ([]int, error) {
 
 	sSQL := fmt.Sprintf(`
 	WITH RECURSIVE parents AS (
-   		SELECT %s, %s, 0 AS level FROM %s WHERE id=%v
-    	UNION ALL
-    	SELECT t.%s, t.%s, p.level + 1 FROM %s t
-    	JOIN parents p ON t.%s = p.%s
+		SELECT %s, %s, 0 AS level FROM %s WHERE id=%v AND IFNULL(%s, 0) <> 1
+		UNION ALL
+		SELECT t.%s, t.%s, p.level + 1 FROM %s t
+		JOIN parents p ON t.%s = p.%s
+		WHERE IFNULL(t.%s, 0) <> 1
 	)
 	SELECT %s FROM parents ORDER BY level DESC`,
-		storage.Fld_common_id, storage.Fld_countries_id_parent, storage.Tbl_countries, id,
+		storage.Fld_common_id, storage.Fld_countries_id_parent, storage.Tbl_countries, id, storage.Fld_common_private,
 		storage.Fld_common_id, storage.Fld_countries_id_parent, storage.Tbl_countries,
-		storage.Fld_common_id, storage.Fld_countries_id_parent,
+		storage.Fld_common_id, storage.Fld_countries_id_parent, storage.Fld_common_private,
 		storage.Fld_common_id,
 	)
 

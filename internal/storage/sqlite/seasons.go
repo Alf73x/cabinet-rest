@@ -107,11 +107,12 @@ func (s *Storage) Db_GetSeasonNames(idssport string) ([]string, error) {
 		sports = fmt.Sprintf(" AND %s IN (%s)", storage.Fld_common_id_base, idssport)
 	}
 
-	sSQL := fmt.Sprintf(`SELECT DISTINCT %s FROM %s WHERE 1=1 %s ORDER BY %s DESC`,
+	sSQL := fmt.Sprintf(`SELECT DISTINCT %s FROM %s WHERE IFNULL(%s, 0) <> 1 %s ORDER BY %s DESC`,
 		storage.Fld_class_season_season, // 1
 		storage.Tbl_class_season,        // 2
-		sports,                          // 3
-		storage.Fld_class_season_season, // 4
+		storage.Fld_common_private,      // 3
+		sports,                          // 4
+		storage.Fld_class_season_season, // 5
 	)
 
 	rows, err := s.db.Query(sSQL)

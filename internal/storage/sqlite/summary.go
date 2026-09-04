@@ -16,10 +16,11 @@ func (s *Storage) Db_GetSummaryCategories() (storage.TblSummaryCategories, error
 	const op = "storage.sqlite.Db_GetSummaryCategories"
 
 	query := fmt.Sprintf(`SELECT DISTINCT TRIM(%[1]s) FROM %[2]s
-		WHERE %[1]s IS NOT NULL AND TRIM(%[1]s) <> ''
+		WHERE %[1]s IS NOT NULL AND TRIM(%[1]s) <> '' AND IFNULL(%[3]s, 0) <> 1
 		ORDER BY TRIM(%[1]s)`,
 		storage.Fld_class_season_group, // 1
 		storage.Tbl_class_season,       // 2
+		storage.Fld_common_private,     // 3
 	)
 
 	rows, err := s.db.Query(query)
@@ -53,6 +54,7 @@ func (s *Storage) Db_GetSummaryCategories() (storage.TblSummaryCategories, error
 func (s *Storage) buildSummarySeasonFilter(category string, leagueRanks []int, yearFrom string, yearTo string, sportIDs []int) (string, []any) {
 	filters := make([]string, 0, 4)
 	args := make([]any, 0, 16)
+	filters = append(filters, fmt.Sprintf("IFNULL(se.%s, 0) <> 1", storage.Fld_common_private))
 
 	if category != "" {
 		filters = append(filters, fmt.Sprintf("se.%s = ?", storage.Fld_class_season_group))
@@ -90,10 +92,6 @@ func (s *Storage) buildSummarySeasonFilter(category string, leagueRanks []int, y
 
 		filters = append(filters, fmt.Sprintf("se.%s IN (%s)", storage.Fld_common_id_base, strings.Join(placeholders, ",")))
 	}
-	if len(filters) == 0 {
-		return "", args
-	}
-
 	return "WHERE " + strings.Join(filters, " AND "), args
 }
 
@@ -176,6 +174,23 @@ func (s *Storage) Db_GetSummaryTable(
 			seasonWhereSQL,               // 4
 		)
 	}
+	publicTeamFilter := fmt.Sprintf(`
+		AND r.%[1]s IN (
+			SELECT t.%[2]s FROM %[3]s t
+			LEFT JOIN %[4]s c ON c.%[2]s = t.%[5]s
+			WHERE IFNULL(t.%[6]s, 0) <> 1 AND IFNULL(c.%[6]s, 0) <> 1
+		)
+		AND r.%[7]s IN (
+			SELECT t.%[2]s FROM %[3]s t
+			LEFT JOIN %[4]s c ON c.%[2]s = t.%[5]s
+			WHERE IFNULL(t.%[6]s, 0) <> 1 AND IFNULL(c.%[6]s, 0) <> 1
+		)`,
+		storage.Fld_common_id_team_1, storage.Fld_common_id,
+		storage.Tbl_class_team, storage.Tbl_countries,
+		storage.Fld_common_id_country, storage.Fld_common_private,
+		storage.Fld_common_id_team_2,
+	)
+	resultsWhereSQL += publicTeamFilter
 
 	query := fmt.Sprintf(`
 		SELECT
@@ -306,6 +321,9 @@ func (s *Storage) Db_GetSummaryTable(
 		LEFT JOIN %[12]s ct ON ct.%[13]s = tt.tid
 		LEFT JOIN %[14]s cou ON cou.%[13]s = ct.%[15]s
 		LEFT JOIN %[14]s country ON country.%[13]s = ct.%[16]s
+		WHERE IFNULL(ct.%[18]s, 0) <> 1
+		  AND IFNULL(cou.%[18]s, 0) <> 1
+		  AND IFNULL(country.%[18]s, 0) <> 1
 		ORDER BY
 			w DESC,
 			(sw + sw0 + sw1 + sw2) DESC,
@@ -330,6 +348,7 @@ func (s *Storage) Db_GetSummaryTable(
 		storage.Fld_common_id_country,      // 15
 		storage.Fld_common_id_country+"_2", // 16
 		storage.Fld_common_id_base,         // 17
+		storage.Fld_common_private,         // 18
 	)
 
 	queryArgs := make([]any, 0, 80)
@@ -453,7 +472,8 @@ func (s *Storage) Db_GetSeasonInfo(id int) (storage.SeasonInfo, error) {
 	sqlText := "SELECT IFNULL(" + storage.Fld_class_season_points + ", ''), " +
 		" IFNULL(" + storage.Fld_class_season_options_2 + ", '')" +
 		" FROM " + storage.Tbl_class_season +
-		" WHERE " + storage.Fld_common_id + "=" + strconv.Itoa(id)
+		" WHERE " + storage.Fld_common_id + "=" + strconv.Itoa(id) +
+		" AND IFNULL(" + storage.Fld_common_private + ", 0) <> 1"
 	rows, err := s.db.Query(sqlText)
 	if err != nil {
 		return result, err
@@ -501,7 +521,9 @@ func (s *Storage) Db_GetTeamInfo(id int) (storage.TeamsInfo, error) {
 		"IFNULL(t." + storage.Fld_common_disbanded_date + ", '') " +
 		"FROM " + storage.Tbl_class_team + " t " +
 		"LEFT JOIN " + storage.Tbl_countries + " c ON c." + storage.Fld_common_id + " = t." + storage.Fld_common_id_country +
-		" WHERE t." + storage.Fld_common_id + " IN (" + sIDs + ")"
+		" WHERE t." + storage.Fld_common_id + " IN (" + sIDs + ")" +
+		" AND IFNULL(t." + storage.Fld_common_private + ", 0) <> 1" +
+		" AND IFNULL(c." + storage.Fld_common_private + ", 0) <> 1"
 
 	rows, err := s.db.Query(sqlText)
 	if err != nil {

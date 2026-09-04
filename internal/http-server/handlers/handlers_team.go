@@ -32,14 +32,14 @@ func NewTeam(log *slog.Logger, getTeamsI IGetTeam) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewTeam"
 
-		log = log.With(slog.String("op", _FunctionName),
-			slog.String("request=id", middleware.GetReqID(r.Context())),
+		requestLog := log.With(slog.String("op", _FunctionName),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
 		sIDTeam := r.URL.Query().Get(Url_Team_ID)
 		if sIDTeam == "" {
 			s := Url_Team_ID + " is empty"
-			log.Info(s)
+			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
 			return
 
@@ -47,21 +47,21 @@ func NewTeam(log *slog.Logger, getTeamsI IGetTeam) http.HandlerFunc {
 		idTeam, err := strconv.Atoi(sIDTeam)
 		if err != nil {
 			s := Url_Team_ID + " must be integer"
-			log.Info(s)
+			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
 			return
 		}
 
 		listTeams, err := getTeamsI.Db_GetTeam(idTeam)
 		if err != nil {
-			log.Error("failed to load team", sl.Err(err))
+			requestLog.Error("failed to load team", sl.Err(err))
 			render.JSON(w, r, resp.Error("failed to load team"))
 			return
 		}
 
 		name, err := getTeamsI.DB_GetTeamName(idTeam, 0)
 		if err != nil {
-			log.Error("failed to load team", sl.Err(err))
+			requestLog.Error("failed to load team", sl.Err(err))
 			render.JSON(w, r, resp.Error("failed to load team"))
 			return
 		}

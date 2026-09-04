@@ -30,14 +30,14 @@ func NewSeasons(log *slog.Logger, getSeasonsI IGetSeasons) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewSeasons"
 
-		log = log.With(
+		requestLog := log.With(
 			slog.String("op", _FunctionName),
-			slog.String("request=id", middleware.GetReqID(r.Context())),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
 		idsSport, err := ParseSportIDs(r.URL.Query().Get(Url_Seasons_IDs_Sport))
 		if err != nil {
-			log.Error(err.Error(), sl.Err(err))
+			requestLog.Error(err.Error(), sl.Err(err))
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
 		}
@@ -49,7 +49,7 @@ func NewSeasons(log *slog.Logger, getSeasonsI IGetSeasons) http.HandlerFunc {
 			// Если names=1 — возвращаем только список названий сезонов
 			listSeasonNames, err := getSeasonsI.Db_GetSeasonNames(strIdsSport)
 			if err != nil {
-				log.Error("failed to load season names", sl.Err(err))
+				requestLog.Error("failed to load season names", sl.Err(err))
 				render.JSON(w, r, resp.Error("failed to load season names"))
 				return
 			}
@@ -68,7 +68,7 @@ func NewSeasons(log *slog.Logger, getSeasonsI IGetSeasons) http.HandlerFunc {
 			nameFilter,
 		)
 		if err != nil {
-			log.Error("failed to load seasons", sl.Err(err))
+			requestLog.Error("failed to load seasons", sl.Err(err))
 			render.JSON(w, r, resp.Error("failed to load seasons"))
 			return
 		}

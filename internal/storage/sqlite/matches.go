@@ -28,8 +28,14 @@ func (s *Storage) Db_GetTeamMatches(idTeam int, idSeason int) ([]storage.TblTeam
 
 	sqlText := "SELECT IFNULL(" + storage.Fld_class_season_options_1 + ", '')" +
 		" FROM " + storage.Tbl_class_season +
-		" WHERE " + storage.Fld_common_id + "=" + sSeasonID
-	rows, err := s.db.Query(sqlText)
+		" WHERE " + storage.Fld_common_id + "=?" +
+		" AND IFNULL(" + storage.Fld_common_private + ", 0) <> 1" +
+		" AND EXISTS (SELECT 1 FROM " + storage.Tbl_class_team + " requested_team" +
+		" LEFT JOIN " + storage.Tbl_countries + " requested_country ON requested_country." + storage.Fld_common_id + "=requested_team." + storage.Fld_common_id_country +
+		" WHERE requested_team." + storage.Fld_common_id + "=?" +
+		" AND IFNULL(requested_team." + storage.Fld_common_private + ", 0) <> 1" +
+		" AND IFNULL(requested_country." + storage.Fld_common_private + ", 0) <> 1)"
+	rows, err := s.db.Query(sqlText, idSeason, idTeam)
 	if err != nil {
 		return nil, err
 	}
@@ -100,17 +106,27 @@ func (s *Storage) Db_GetTeamMatches(idTeam int, idSeason int) ([]storage.TblTeam
 	}
 
 	str := "SELECT " +
-		"IFNULL(" + storage.Fld_common_id_team_1 + ",0), " +
-		"IFNULL(" + storage.Fld_common_id_team_2 + ",0), " +
-		"IFNULL(" + storage.Fld_sport_scored + ",0), " +
-		"IFNULL(" + storage.Fld_sport_scored_et + ",0), " +
-		"IFNULL(" + storage.Fld_sport_missed + ",0), " +
-		"IFNULL(" + storage.Fld_sport_missed_et + ",0), " +
-		"IFNULL(" + storage.Fld_sport_result_type + ",0), " +
-		"IFNULL(" + storage.Fld_sport_stage_index + ",0), " +
-		"IFNULL(" + storage.Fld_common_date + ",'')"
-	str += " FROM " + storage.Tbl_sport_results
-	str += " WHERE id_season IN (" + sSeasonID + ")"
+		"IFNULL(r." + storage.Fld_common_id_team_1 + ",0), " +
+		"IFNULL(r." + storage.Fld_common_id_team_2 + ",0), " +
+		"IFNULL(r." + storage.Fld_sport_scored + ",0), " +
+		"IFNULL(r." + storage.Fld_sport_scored_et + ",0), " +
+		"IFNULL(r." + storage.Fld_sport_missed + ",0), " +
+		"IFNULL(r." + storage.Fld_sport_missed_et + ",0), " +
+		"IFNULL(r." + storage.Fld_sport_result_type + ",0), " +
+		"IFNULL(r." + storage.Fld_sport_stage_index + ",0), " +
+		"IFNULL(r." + storage.Fld_common_date + ",'')"
+	str += " FROM " + storage.Tbl_sport_results + " r"
+	str += " JOIN " + storage.Tbl_class_season + " se ON se." + storage.Fld_common_id + "=r." + storage.Fld_common_id_season
+	str += " JOIN " + storage.Tbl_class_team + " tm1 ON tm1." + storage.Fld_common_id + "=r." + storage.Fld_common_id_team_1
+	str += " JOIN " + storage.Tbl_class_team + " tm2 ON tm2." + storage.Fld_common_id + "=r." + storage.Fld_common_id_team_2
+	str += " LEFT JOIN " + storage.Tbl_countries + " c1 ON c1." + storage.Fld_common_id + "=tm1." + storage.Fld_common_id_country
+	str += " LEFT JOIN " + storage.Tbl_countries + " c2 ON c2." + storage.Fld_common_id + "=tm2." + storage.Fld_common_id_country
+	str += " WHERE r." + storage.Fld_common_id_season + " IN (" + sSeasonID + ")"
+	str += " AND IFNULL(se." + storage.Fld_common_private + ", 0) <> 1"
+	str += " AND IFNULL(tm1." + storage.Fld_common_private + ", 0) <> 1"
+	str += " AND IFNULL(tm2." + storage.Fld_common_private + ", 0) <> 1"
+	str += " AND IFNULL(c1." + storage.Fld_common_private + ", 0) <> 1"
+	str += " AND IFNULL(c2." + storage.Fld_common_private + ", 0) <> 1"
 	str += " AND (" + storage.Fld_common_id_team_1 + " IN (" + sIDs + ")" + " OR " + storage.Fld_common_id_team_2 + " IN (" + sIDs + "))"
 	str += sExtraTeamsFilter
 	str += " ORDER BY " + storage.Fld_common_date + " DESC "

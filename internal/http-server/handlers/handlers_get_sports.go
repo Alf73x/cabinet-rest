@@ -24,13 +24,13 @@ func NewSports(log *slog.Logger, getSportsI IGetSports) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewSport"
 
-		log = log.With(slog.String("op", _FunctionName),
-			slog.String("request=id", middleware.GetReqID(r.Context())),
+		requestLog := log.With(slog.String("op", _FunctionName),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
 		listSports, err := getSportsI.Db_GetSports()
 		if err != nil {
-			log.Error("failed to load seasons", sl.Err(err))
+			requestLog.Error("failed to load seasons", sl.Err(err))
 			render.JSON(w, r, resp.Error("failed to load seasons"))
 			return
 		}

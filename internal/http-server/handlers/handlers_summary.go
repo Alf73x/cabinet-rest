@@ -30,7 +30,7 @@ func NewSummaryTable(log *slog.Logger, summaryTableI ISummaryTable) http.Handler
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewSummaryTable"
 
-		log = log.With(
+		requestLog := log.With(
 			slog.String("op", _FunctionName),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
@@ -45,7 +45,7 @@ func NewSummaryTable(log *slog.Logger, summaryTableI ISummaryTable) http.Handler
 
 			leagueRanks, err = ParseLeagueRanks(leagueRanksText)
 			if err != nil {
-				log.Error("invalid league_ranks", sl.Err(err))
+				requestLog.Error("invalid league_ranks", sl.Err(err))
 				render.Status(r, http.StatusBadRequest)
 				render.JSON(w, r, resp.Error("invalid league_ranks"))
 				return
@@ -65,7 +65,7 @@ func NewSummaryTable(log *slog.Logger, summaryTableI ISummaryTable) http.Handler
 			r.URL.Query().Get(Url_SummaryTables_SportIDs),
 		)
 		if err != nil {
-			log.Error("invalid sport_ids", sl.Err(err))
+			requestLog.Error("invalid sport_ids", sl.Err(err))
 			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, resp.Error("invalid sport_ids"))
 			return
@@ -79,7 +79,7 @@ func NewSummaryTable(log *slog.Logger, summaryTableI ISummaryTable) http.Handler
 			sportIDs,
 		)
 		if err != nil {
-			log.Error("failed to load summary table", sl.Err(err))
+			requestLog.Error("failed to load summary table", sl.Err(err))
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, resp.Error("failed to load summary table"))
 			return

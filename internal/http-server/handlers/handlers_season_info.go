@@ -25,14 +25,14 @@ func NewSeasonInfo(log *slog.Logger, getSeasonInfoI IGetSeasonInfo) http.Handler
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewGetSeasonInfo"
 
-		log = log.With(slog.String("op", _FunctionName),
-			slog.String("request=id", middleware.GetReqID(r.Context())),
+		requestLog := log.With(slog.String("op", _FunctionName),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
 		sId := r.URL.Query().Get(Url_Info_ID)
 		if sId == "" {
 			s := Url_Info_ID + " is empty"
-			log.Info(s)
+			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
 			return
 
@@ -40,13 +40,13 @@ func NewSeasonInfo(log *slog.Logger, getSeasonInfoI IGetSeasonInfo) http.Handler
 		id, err := strconv.Atoi(sId)
 		if err != nil {
 			s := Url_Info_ID + " must be integer"
-			log.Info(s)
+			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
 		}
 
 		info, err := getSeasonInfoI.Db_GetSeasonInfo(id)
 		if err != nil {
-			log.Error("failed to load season info", sl.Err(err))
+			requestLog.Error("failed to load season info", sl.Err(err))
 			render.JSON(w, r, resp.Error("failed to load season info"))
 			return
 		}

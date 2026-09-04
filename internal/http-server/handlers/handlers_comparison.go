@@ -31,7 +31,7 @@ func NewComparison(log *slog.Logger, comparisonI IComparison) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewComparison"
 
-		log = log.With(slog.String("op", _FunctionName), slog.String("request_id", middleware.GetReqID(r.Context())))
+		requestLog := log.With(slog.String("op", _FunctionName), slog.String("request_id", middleware.GetReqID(r.Context())))
 
 		opponent1Type := r.URL.Query().Get(Url_Comparison_opponent1Type)
 		opponent2Type := r.URL.Query().Get(Url_Comparison_opponent2Type)
@@ -39,7 +39,7 @@ func NewComparison(log *slog.Logger, comparisonI IComparison) http.HandlerFunc {
 		if err != nil || opponent1ID <= 0 {
 			err := errInvalidComparisonParameter(Url_Comparison_opponent1Id)
 
-			log.Error(err.Error(), sl.Err(err))
+			requestLog.Error(err.Error(), sl.Err(err))
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
 		}
@@ -48,7 +48,7 @@ func NewComparison(log *slog.Logger, comparisonI IComparison) http.HandlerFunc {
 		if err != nil || opponent2ID <= 0 {
 			err := errInvalidComparisonParameter(Url_Comparison_opponent2Id)
 
-			log.Error(err.Error(), sl.Err(err))
+			requestLog.Error(err.Error(), sl.Err(err))
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
 		}
@@ -56,7 +56,7 @@ func NewComparison(log *slog.Logger, comparisonI IComparison) http.HandlerFunc {
 		if !isValidOpponentType(opponent1Type) {
 			err := errInvalidComparisonParameter(Url_Comparison_opponent1Type)
 
-			log.Error(err.Error(), sl.Err(err))
+			requestLog.Error(err.Error(), sl.Err(err))
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
 		}
@@ -64,7 +64,7 @@ func NewComparison(log *slog.Logger, comparisonI IComparison) http.HandlerFunc {
 		if !isValidOpponentType(opponent2Type) {
 			err := errInvalidComparisonParameter(Url_Comparison_opponent2Type)
 
-			log.Error(err.Error(), sl.Err(err))
+			requestLog.Error(err.Error(), sl.Err(err))
 			render.JSON(w, r, resp.Error(err.Error()))
 			return
 		}
@@ -78,7 +78,7 @@ func NewComparison(log *slog.Logger, comparisonI IComparison) http.HandlerFunc {
 			r.URL.Query().Get(Url_Comparison_IDs_Sport),
 		)
 		if err != nil {
-			log.Error("invalid sport_ids", sl.Err(err))
+			requestLog.Error("invalid sport_ids", sl.Err(err))
 			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, resp.Error("invalid sport_ids"))
 			return
@@ -90,7 +90,7 @@ func NewComparison(log *slog.Logger, comparisonI IComparison) http.HandlerFunc {
 		if leagueRanksText != "" {
 			leagueRanks, err = ParseSportIDs(leagueRanksText)
 			if err != nil {
-				log.Error("invalid league_ranks", sl.Err(err))
+				requestLog.Error("invalid league_ranks", sl.Err(err))
 				render.Status(r, http.StatusBadRequest)
 				render.JSON(w, r, resp.Error("invalid league_ranks"))
 				return
@@ -99,7 +99,7 @@ func NewComparison(log *slog.Logger, comparisonI IComparison) http.HandlerFunc {
 
 		comparison, err := comparisonI.Db_GetComparison(opponent1Type, opponent1ID, opponent2Type, opponent2ID, competitionFilter, sportIDs, leagueRanks)
 		if err != nil {
-			log.Error("failed to load comparison", sl.Err(err))
+			requestLog.Error("failed to load comparison", sl.Err(err))
 			render.JSON(w, r, resp.Error("failed to load comparison"))
 			return
 		}

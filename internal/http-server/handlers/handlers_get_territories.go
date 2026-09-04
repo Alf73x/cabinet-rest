@@ -40,28 +40,28 @@ func NewTerritoryChildren(log *slog.Logger, getTerritoriesI IGetDb_GetTerritorie
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewTerritoryChildren"
 
-		log = log.With(slog.String("op", _FunctionName),
-			slog.String("request=id", middleware.GetReqID(r.Context())),
+		requestLog := log.With(slog.String("op", _FunctionName),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
 		/*
 			var req Request
 			err := render.DecodeJSON(r.Body, &req)
 			if errors.Is(err, io.EOF) { // empty body
-				log.Error("request body is empty")
+				requestLog.Error("request body is empty")
 				render.JSON(w, r, resp.Error("empty request"))
 				return
 			}
 			if err != nil {
-				log.Error("failed to decode request body", sl.Err(err))
+				requestLog.Error("failed to decode request body", sl.Err(err))
 				render.JSON(w, r, resp.Error("failed to decode request"))
 				return
 			}
-			log.Info("request body decoded", slog.Any("request", req))
+			requestLog.Info("request body decoded", slog.Any("request", req))
 
 			if err := validator.New().Struct(req); err != nil {
 				validateErr := err.(validator.ValidationErrors)
-				log.Error("invalid request", sl.Err(err))
+				requestLog.Error("invalid request", sl.Err(err))
 				render.JSON(w, r, resp.ValidationError(validateErr))
 				return
 			}
@@ -71,7 +71,7 @@ func NewTerritoryChildren(log *slog.Logger, getTerritoriesI IGetDb_GetTerritorie
 		sId := chi.URLParam(r, Url_Territories_ID)
 		if sId == "" {
 			s := Url_Territories_ID + " is empty"
-			log.Info(s)
+			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
 			return
 
@@ -79,13 +79,13 @@ func NewTerritoryChildren(log *slog.Logger, getTerritoriesI IGetDb_GetTerritorie
 		id, err := strconv.Atoi(sId)
 		if err != nil {
 			s := Url_Territories_ID + " must be integer"
-			log.Info(s)
+			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
 		}
 
 		listItems, err := getTerritoriesI.Db_GetTerritories(id)
 		/* 		if errors.Is(err, storage.ErrURLExists) {
-			log.Info("url already exists", slog.String("url", req.URL))
+			requestLog.Info("url already exists", slog.String("url", req.URL))
 
 			render.JSON(w, r, resp.Error("url already exists"))
 
@@ -93,7 +93,7 @@ func NewTerritoryChildren(log *slog.Logger, getTerritoriesI IGetDb_GetTerritorie
 		} */
 		if err != nil {
 			s := "failed to load tree items"
-			log.Error(s, sl.Err(err))
+			requestLog.Error(s, sl.Err(err))
 			render.JSON(w, r, resp.Error(s))
 			return
 		}
@@ -106,8 +106,8 @@ func NewTerritorySearch(log *slog.Logger, searchTerritoriesI IGetDb_SearchTerrit
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewTerritorySearch"
 
-		log = log.With(slog.String("op", _FunctionName),
-			slog.String("request=id", middleware.GetReqID(r.Context())),
+		requestLog := log.With(slog.String("op", _FunctionName),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
 		sFilter := strings.TrimSpace(
@@ -115,7 +115,7 @@ func NewTerritorySearch(log *slog.Logger, searchTerritoriesI IGetDb_SearchTerrit
 		)
 		if sFilter == "" {
 			s := "filter is empty"
-			log.Info(s)
+			requestLog.Info(s)
 
 			render.JSON(w, r, resp.Error(s))
 			return
@@ -124,7 +124,7 @@ func NewTerritorySearch(log *slog.Logger, searchTerritoriesI IGetDb_SearchTerrit
 		listItems, err := searchTerritoriesI.Db_SearchTerritories(sFilter)
 		if err != nil {
 			s := "failed to load tree items"
-			log.Error(s, sl.Err(err))
+			requestLog.Error(s, sl.Err(err))
 			render.JSON(w, r, resp.Error(s))
 			return
 		}
@@ -137,8 +137,8 @@ func NewTerritoryPath(log *slog.Logger, pathTerritoriesI IGetDb_PathTerritories)
 	return func(w http.ResponseWriter, r *http.Request) {
 		const _FunctionName = "handlers.NewTerritoryPath"
 
-		log = log.With(slog.String("op", _FunctionName),
-			slog.String("request=id", middleware.GetReqID(r.Context())),
+		requestLog := log.With(slog.String("op", _FunctionName),
+			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
 
 		sId := strings.TrimSpace(
@@ -147,7 +147,7 @@ func NewTerritoryPath(log *slog.Logger, pathTerritoriesI IGetDb_PathTerritories)
 
 		if sId == "" {
 			s := Url_Territories_ID + " is empty"
-			log.Info(s)
+			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
 			return
 
@@ -155,14 +155,14 @@ func NewTerritoryPath(log *slog.Logger, pathTerritoriesI IGetDb_PathTerritories)
 		id, err := strconv.Atoi(sId)
 		if err != nil {
 			s := Url_Territories_ID + " must be integer"
-			log.Info(s)
+			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
 		}
 
 		listItems, err := pathTerritoriesI.Db_PathTerritories(id)
 		if err != nil {
 			s := "failed to find path"
-			log.Error(s, sl.Err(err))
+			requestLog.Error(s, sl.Err(err))
 			render.JSON(w, r, resp.Error(s))
 			return
 		}

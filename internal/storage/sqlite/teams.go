@@ -14,10 +14,21 @@ import (
 
 func (s *Storage) Db_GetTeams(idTerritory int, idssport string) ([]storage.TblTeams, error) {
 	const _FunctionName = "storage.sqlite.Db_GetTeams"
+	if idTerritory > 0 {
+		var territoryIsPublic bool
+		query := "SELECT EXISTS (SELECT 1 FROM " + storage.Tbl_countries +
+			" WHERE " + storage.Fld_common_id + "=? AND IFNULL(" + storage.Fld_common_private + ", 0) <> 1)"
+		if err := s.db.QueryRow(query, idTerritory).Scan(&territoryIsPublic); err != nil {
+			return nil, fmt.Errorf("%s: check territory: %w", _FunctionName, err)
+		}
+		if !territoryIsPublic {
+			return []storage.TblTeams{}, nil
+		}
+	}
 
 	sFilter := s.Tree_TreeChildrenFilter(idTerritory, "")
 	sSQL := "WITH CTE_Teams AS ( "
-	sSQL = sSQL + "   SELECT id FROM " + storage.Tbl_class_team + " WHERE " + sFilter
+	sSQL = sSQL + "   SELECT id FROM " + storage.Tbl_class_team + " WHERE " + sFilter + " AND IFNULL(" + storage.Fld_common_private + ", 0) <> 1"
 	sSQL = sSQL + ")"
 	sSQL = sSQL + " SELECT "
 	sSQL = sSQL + " tm." + storage.Fld_common_id + " teamid, "
@@ -44,7 +55,7 @@ func (s *Storage) Db_GetTeams(idTerritory int, idssport string) ([]storage.TblTe
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_sport_tables + " t ON t." + storage.Fld_common_id_season + "=s." + storage.Fld_common_id + " AND t." + storage.Fld_common_id_team + " IN (SELECT * FROM CTE_Teams)"
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_class_team + " tm ON tm." + storage.Fld_common_id + "=t." + storage.Fld_common_id_team
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_countries + " c ON c." + storage.Fld_common_id + "=tm." + storage.Fld_common_id_country
-	sSQL = sSQL + " WHERE tm." + storage.Fld_common_id + " IN (SELECT * FROM CTE_Teams) "
+	sSQL = sSQL + " WHERE tm." + storage.Fld_common_id + " IN (SELECT * FROM CTE_Teams) AND IFNULL(s." + storage.Fld_common_private + ", 0) <> 1 AND IFNULL(tm." + storage.Fld_common_private + ", 0) <> 1 AND IFNULL(c." + storage.Fld_common_private + ", 0) <> 1 "
 	sSQL = sSQL + " AND " + GetBaseFilter(idssport, "s.")
 	sSQL = sSQL + " ORDER BY " + storage.Fld_class_season_season + " DESC, s." + storage.Fld_common_sort_order + " DESC "
 
@@ -111,7 +122,9 @@ func (s *Storage) DB_GetTeamName(id int, mode int) (string, error) {
 		"FROM " + storage.Tbl_class_team + " t " +
 		"LEFT JOIN " + storage.Tbl_countries + " c ON t." +
 		storage.Fld_common_id_country + "=c." + storage.Fld_common_id + " " +
-		"WHERE t." + storage.Fld_common_id + "=" + strconv.Itoa(id)
+		"WHERE t." + storage.Fld_common_id + "=" + strconv.Itoa(id) +
+		" AND IFNULL(t." + storage.Fld_common_private + ", 0) <> 1" +
+		" AND IFNULL(c." + storage.Fld_common_private + ", 0) <> 1"
 	row := s.db.QueryRow(str)
 	var teamName string
 	var countryName string
@@ -172,7 +185,7 @@ func (s *Storage) Db_GetTeam(id int) ([]storage.TblTeam, error) {
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_sport_tables + " t ON t." + storage.Fld_common_id_season + "=s." + storage.Fld_common_id + " AND t." + storage.Fld_common_id_team + " IN (" + sIDs + ")"
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_class_team + " tm ON tm." + storage.Fld_common_id + "=t." + storage.Fld_common_id_team
 	sSQL = sSQL + " LEFT JOIN " + storage.Tbl_countries + " c ON c." + storage.Fld_common_id + "=tm." + storage.Fld_common_id_country
-	sSQL = sSQL + " WHERE tm." + storage.Fld_common_id + " IN (" + sIDs + ") AND IFNULL(s." + storage.Fld_common_private + ", 0) <> 1 AND IFNULL(tm." + storage.Fld_common_private + ", 0) <> 1  "
+	sSQL = sSQL + " WHERE tm." + storage.Fld_common_id + " IN (" + sIDs + ") AND IFNULL(s." + storage.Fld_common_private + ", 0) <> 1 AND IFNULL(tm." + storage.Fld_common_private + ", 0) <> 1 AND IFNULL(c." + storage.Fld_common_private + ", 0) <> 1 "
 	sSQL = sSQL + " ORDER BY " + storage.Fld_class_season_season + " DESC, s." + storage.Fld_common_sort_order + " DESC "
 
 	rows, err := s.db.Query(sSQL)

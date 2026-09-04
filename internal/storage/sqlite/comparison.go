@@ -95,7 +95,7 @@ func (s *Storage) db_GetOpponentTeams(sportIDs []int) ([]storage.OpponentTeam, e
 	} else {
 		query += fmt.Sprintf(` WHERE b.%s = -1`, storage.Fld_common_id)
 	}
-	query += fmt.Sprintf(` AND IFNULL(t.%s, 0) <> 1`, storage.Fld_common_private)
+	query += fmt.Sprintf(` AND IFNULL(t.%s, 0) <> 1 AND IFNULL(c.%s, 0) <> 1`, storage.Fld_common_private, storage.Fld_common_private)
 	query += fmt.Sprintf(` ORDER BY t.%s, c.%s`, storage.Fld_common_name, storage.Fld_common_name)
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -334,13 +334,19 @@ func (s *Storage) getComparisonTeamIDs(opponentType string, opponentID int, spor
 			args[i] = sportID
 		}
 
-		query := fmt.Sprintf(` SELECT %[1]s FROM %[2]s WHERE %[3]s IN (%[4]s) AND %[5]s IN (%[6]s) ORDER BY %[1]s`,
+		query := fmt.Sprintf(`SELECT t.%[1]s FROM %[2]s t
+			LEFT JOIN %[7]s c ON c.%[1]s = t.%[3]s
+			WHERE t.%[3]s IN (%[4]s) AND t.%[5]s IN (%[6]s)
+			AND IFNULL(t.%[8]s, 0) <> 1 AND IFNULL(c.%[8]s, 0) <> 1
+			ORDER BY t.%[1]s`,
 			storage.Fld_common_id,           // 1
 			storage.Tbl_class_team,          // 2
 			storage.Fld_common_id_country,   // 3
 			territoryIDs,                    // 4
 			storage.Fld_common_id_base,      // 5
 			strings.Join(placeholders, ","), // 6
+			storage.Tbl_countries,           // 7
+			storage.Fld_common_private,      // 8
 		)
 
 		rows, err := s.db.Query(query, args...)
@@ -389,12 +395,20 @@ func (s *Storage) getTeamIDForSports(teamID int, sportIDs []int) ([]int, error) 
 		args = append(args, sportID)
 	}
 
-	query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s = ? AND %s IN (%s) LIMIT 1	`,
+	query := fmt.Sprintf(`SELECT t.%s FROM %s t
+		LEFT JOIN %s c ON c.%s = t.%s
+		WHERE t.%s = ? AND t.%s IN (%s)
+		AND IFNULL(t.%s, 0) <> 1 AND IFNULL(c.%s, 0) <> 1 LIMIT 1`,
 		storage.Fld_common_id,
 		storage.Tbl_class_team,
+		storage.Tbl_countries,
+		storage.Fld_common_id,
+		storage.Fld_common_id_country,
 		storage.Fld_common_id,
 		storage.Fld_common_id_base,
 		strings.Join(placeholders, ","),
+		storage.Fld_common_private,
+		storage.Fld_common_private,
 	)
 
 	var id int
@@ -500,6 +514,7 @@ func (s *Storage) getDirectComparisonStat(teamID1 int, teamID2 int, competitionF
 			LEFT JOIN %[9]s se ON se.%[10]s = r.%[1]s
 			WHERE r.%[11]s = ?
 			  AND r.%[12]s = ?
+			  AND IFNULL(se.%[13]s, 0) <> 1
 			  %s
 			  %s
 		) comparison_data`,
@@ -515,6 +530,7 @@ func (s *Storage) getDirectComparisonStat(teamID1 int, teamID2 int, competitionF
 		storage.Fld_common_id,                // 10
 		storage.Fld_common_id_team_1,         // 11
 		storage.Fld_common_id_team_2,         // 12
+		storage.Fld_common_private,           // 13
 		leagueFilterSQL,
 		rankFilterSQL,
 	)
@@ -660,10 +676,17 @@ func (s *Storage) buildSportComparisonRankFilter(leagueRanks []int) (string, []a
 
 func (s *Storage) getTeamSportID(teamID int) (int, error) {
 	query := fmt.Sprintf(
-		`SELECT %s FROM %s WHERE %s = ?`,
+		`SELECT t.%s FROM %s t
+		 LEFT JOIN %s c ON c.%s = t.%s
+		 WHERE t.%s = ? AND IFNULL(t.%s, 0) <> 1 AND IFNULL(c.%s, 0) <> 1`,
 		storage.Fld_common_id_base,
 		storage.Tbl_class_team,
+		storage.Tbl_countries,
 		storage.Fld_common_id,
+		storage.Fld_common_id_country,
+		storage.Fld_common_id,
+		storage.Fld_common_private,
+		storage.Fld_common_private,
 	)
 
 	var sportID int
@@ -703,10 +726,16 @@ func (s *Storage) Db_GetComparisonMatches(team1ID int, team2ID int) ([]storage.T
 		LEFT JOIN %[13]s c1 ON c1.%[12]s = t1.%[14]s
 		LEFT JOIN %[11]s t2 ON t2.%[12]s = r.%[2]s
 		LEFT JOIN %[13]s c2 ON c2.%[12]s = t2.%[14]s
+		LEFT JOIN %[16]s se ON se.%[12]s = r.%[18]s
 		WHERE
-			(r.%[1]s = ? AND r.%[2]s = ?)
+			((r.%[1]s = ? AND r.%[2]s = ?)
 			OR
-			(r.%[1]s = ? AND r.%[2]s = ?)
+			(r.%[1]s = ? AND r.%[2]s = ?))
+			AND IFNULL(t1.%[15]s, 0) <> 1
+			AND IFNULL(t2.%[15]s, 0) <> 1
+			AND IFNULL(c1.%[15]s, 0) <> 1
+			AND IFNULL(c2.%[15]s, 0) <> 1
+			AND IFNULL(se.%[15]s, 0) <> 1
 		ORDER BY r.%[9]s DESC`,
 		storage.Fld_common_id_team_1,  // 1
 		storage.Fld_common_id_team_2,  // 2
@@ -722,6 +751,10 @@ func (s *Storage) Db_GetComparisonMatches(team1ID int, team2ID int) ([]storage.T
 		storage.Fld_common_id,         // 12
 		storage.Tbl_countries,         // 13
 		storage.Fld_common_id_country, // 14
+		storage.Fld_common_private,    // 15
+		storage.Tbl_class_season,      // 16
+		storage.Fld_common_id,          // 17 (reserved for positional stability)
+		storage.Fld_common_id_season,   // 18
 	)
 
 	rows, err := s.db.Query(query, team1ID, team2ID, team2ID, team1ID)

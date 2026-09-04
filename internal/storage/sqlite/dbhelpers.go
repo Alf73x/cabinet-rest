@@ -61,7 +61,9 @@ func (s *Storage) Tree_FindTreeChildrenIDs(AiID int) string {
 		for i := 1; i <= storage.KSubIDsCount; i++ {
 			sSQL = sSQL + ",IFNULL(" + storage.Fld_common_sub_id + "_" + strconv.Itoa(i) + ",-1)"
 		}
-		sSQL = sSQL + " FROM " + storage.Tbl_countries + " ORDER BY " + storage.Fld_countries_id_parent
+		sSQL = sSQL + " FROM " + storage.Tbl_countries +
+			" WHERE IFNULL(" + storage.Fld_common_private + ", 0) <> 1" +
+			" ORDER BY " + storage.Fld_countries_id_parent
 		rows, err := s.db.Query(sSQL)
 		if err == nil {
 			defer rows.Close()
@@ -467,6 +469,19 @@ func (s *Storage) GetSportRankAsInt(iRank int) string {
 }
 
 func (s *Storage) GetTeamTreeIDs(teamID int) ([]int, error) {
+	var rootIsPublic bool
+	rootQuery := "SELECT EXISTS (SELECT 1 FROM " + storage.Tbl_class_team + " t" +
+		" LEFT JOIN " + storage.Tbl_countries + " c ON c." + storage.Fld_common_id + "=t." + storage.Fld_common_id_country +
+		" WHERE t." + storage.Fld_common_id + "=?" +
+		" AND IFNULL(t." + storage.Fld_common_private + ", 0) <> 1" +
+		" AND IFNULL(c." + storage.Fld_common_private + ", 0) <> 1)"
+	if err := s.db.QueryRow(rootQuery, teamID).Scan(&rootIsPublic); err != nil {
+		return nil, err
+	}
+	if !rootIsPublic {
+		return []int{}, nil
+	}
+
 	result := []int{teamID}
 	used := map[int]bool{
 		teamID: true,
@@ -476,9 +491,12 @@ func (s *Storage) GetTeamTreeIDs(teamID int) ([]int, error) {
 
 	getChildren = func(id int) error {
 		rows, err := s.db.Query(
-			"SELECT "+storage.Fld_common_id+
-				" FROM "+storage.Tbl_class_team+
-				" WHERE "+storage.Fld_common_id_successor+" = ?",
+			"SELECT t."+storage.Fld_common_id+
+				" FROM "+storage.Tbl_class_team+" t"+
+				" LEFT JOIN "+storage.Tbl_countries+" c ON c."+storage.Fld_common_id+"=t."+storage.Fld_common_id_country+
+				" WHERE t."+storage.Fld_common_id_successor+" = ?"+
+				" AND IFNULL(t."+storage.Fld_common_private+", 0) <> 1"+
+				" AND IFNULL(c."+storage.Fld_common_private+", 0) <> 1",
 			id,
 		)
 		if err != nil {
@@ -1035,7 +1053,8 @@ func (s *Storage) GetTeamNameByID(teamID int) (string, error) {
 	const op = "storage.GetTeamNameByID"
 
 	query := fmt.Sprintf(`SELECT t.%s,IFNULL(c.%s, '')  FROM %s t
-	LEFT JOIN %s c 	ON t.%s = c.%s WHERE t.%s = ?`,
+	LEFT JOIN %s c 	ON t.%s = c.%s WHERE t.%s = ?
+	AND IFNULL(t.%s, 0) <> 1 AND IFNULL(c.%s, 0) <> 1`,
 		storage.Fld_common_name,
 		storage.Fld_common_name,
 		storage.Tbl_class_team,
@@ -1043,6 +1062,8 @@ func (s *Storage) GetTeamNameByID(teamID int) (string, error) {
 		storage.Fld_common_id_country,
 		storage.Fld_common_id,
 		storage.Fld_common_id,
+		storage.Fld_common_private,
+		storage.Fld_common_private,
 	)
 
 	var teamName string
