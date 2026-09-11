@@ -229,7 +229,10 @@ func main() {
 			r.Get("/path", handlers.NewTerritoryPath(log, storage))
 			r.Get("/{"+handlers.Url_Territories_ID+":[0-9]+}", handlers.NewTerritoryChildren(log, storage))
 		})
-		r.Route(handlers.Url_Seasons, func(r chi.Router) { r.Get("/", handlers.NewSeasons(log, storage)) })
+		r.Route(handlers.Url_Seasons, func(r chi.Router) {
+			r.Get("/", handlers.NewSeasons(log, storage))
+			r.Get("/navigation", handlers.NewSeasonNavigation(log, storage))
+		})
 		r.Route(handlers.Url_Sports, func(r chi.Router) { r.Get("/", handlers.NewSports(log, storage)) })
 		r.Route(handlers.Url_Teams, func(r chi.Router) { r.Get("/", handlers.NewTeams(log, storage)) })
 		r.Route(handlers.Url_Team_Matches, func(r chi.Router) { r.Get("/", handlers.NewTeamMatches(log, storage)) })

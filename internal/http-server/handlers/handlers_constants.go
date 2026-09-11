@@ -13,6 +13,8 @@ const Url_Seasons_IDs_Sport = "sport_ids"
 const Url_Seasons_Season_Filter = "season_filter"
 const Url_Seasons_Name_Filter = "name_filter"
 const Url_Seasons_Names = "names"
+const Url_Seasons_ID = "id"
+const Url_Seasons_Navigation = "navigation" // "/api/v1/seasons/navigation?id=123&direction=prev"
 
 const Url_Sports = "/api/v1/sports" // "/api/v1/sports"
 

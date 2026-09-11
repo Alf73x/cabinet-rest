@@ -42,6 +42,7 @@ func NewSeasonInfo(log *slog.Logger, getSeasonInfoI IGetSeasonInfo) http.Handler
 			s := Url_Info_ID + " must be integer"
 			requestLog.Info(s)
 			render.JSON(w, r, resp.Error(s))
+			return
 		}
 
 		info, err := getSeasonInfoI.Db_GetSeasonInfo(id)

@@ -6,6 +6,7 @@ import (
 	"CabinetREST/internal/storage"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
@@ -24,6 +25,7 @@ type ResponseSeasonNames struct {
 type IGetSeasons interface {
 	Db_GetSeasons(idsSport string, filterSeason string, filterName string) ([]storage.TblSeason, error)
 	Db_GetSeasonNames(idsSport string) ([]string, error)
+	Db_GetSeasonByID(id int) (storage.TblSeason, error)
 }
 
 func NewSeasons(log *slog.Logger, getSeasonsI IGetSeasons) http.HandlerFunc {
@@ -34,6 +36,40 @@ func NewSeasons(log *slog.Logger, getSeasonsI IGetSeasons) http.HandlerFunc {
 			slog.String("op", _FunctionName),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
+
+		/*
+		 * Получение одного турнира/сезона по ID.
+		 *
+		 * Например:
+		 * GET /seasons?id=300
+		 */
+		sID := r.URL.Query().Get(Url_Seasons_ID)
+		if sID != "" {
+			id, err := strconv.Atoi(sID)
+			if err != nil {
+				requestLog.Info(Url_Seasons_ID + " must be integer")
+				render.JSON(w, r, resp.Error(Url_Seasons_ID+" must be integer"))
+				return
+			}
+
+			season, err := getSeasonsI.Db_GetSeasonByID(id)
+
+			if err != nil {
+				requestLog.Error("failed to load season by id", sl.Err(err))
+				render.JSON(w, r, resp.Error("failed to load season"))
+				return
+			}
+
+			/*
+			 * Возвращаем тот же формат list,
+			 * что и Db_GetSeasons.
+			 *
+			 * Это позволяет frontend использовать
+			 * один ApiResponse<SeasonItem>.
+			 */
+			responseSeasonsOK(w, r, []storage.TblSeason{season})
+			return
+		}
 
 		idsSport, err := ParseSportIDs(r.URL.Query().Get(Url_Seasons_IDs_Sport))
 		if err != nil {

@@ -214,3 +214,255 @@ func (s *Storage) DB_GetSeasonVariables(id int) (ti storage.TournamentInfo, e er
 
 	return info, err
 }
+
+/*********************************************************************
+Db_GetSeasonByID
+**********************************************************************/
+
+func (s *Storage) Db_GetSeasonByID(id int) (storage.TblSeason, error) {
+	const _FunctionName = "storage.sqlite.Db_GetSeasonByID"
+
+	sSQL := fmt.Sprintf(`
+		SELECT
+			%s,
+			%s,
+			IFNULL(%s, ''),
+			%s,
+			%s,
+			%s,
+			IFNULL(%s, 0),
+			IFNULL(%s, 0),
+			IFNULL(%s, ''),
+			IFNULL(%s, ''),
+			IFNULL(%s, ''),
+			IFNULL(%s, 0),
+			IFNULL(%s, ''),
+			IFNULL(%s, '')
+		FROM %s
+		WHERE %s = ?
+		  AND IFNULL(%s, 0) <> 1
+	`,
+		storage.Fld_common_id,
+		storage.Fld_class_season_season,
+		storage.Fld_common_prefix,
+		storage.Fld_common_name,
+		storage.Fld_common_id_base,
+		storage.Fld_common_group_id,
+		storage.Fld_class_season_league_rank,
+		storage.Fld_common_sort_order,
+		storage.Fld_class_season_points,
+		storage.Fld_class_season_options_1,
+		storage.Fld_class_season_options_2,
+		storage.Fld_common_icon_index,
+		storage.Fld_class_season_plain_text,
+		storage.Fld_class_season_remark_text,
+		storage.Tbl_class_season,
+		storage.Fld_common_id,
+		storage.Fld_common_private,
+	)
+
+	var season storage.TblSeason
+
+	err := s.db.QueryRow(sSQL, id).Scan(
+		&season.ID,
+		&season.Season,
+		&season.Prefix,
+		&season.Name,
+		&season.SportID,
+		&season.GroupID,
+		&season.LeagueRank,
+		&season.SortOrder,
+		&season.Points,
+		&season.Options1,
+		&season.Options2,
+		&season.IconIndex,
+		&season.PlainText,
+		&season.RemarkText,
+	)
+	if err != nil {
+		return storage.TblSeason{},
+			fmt.Errorf("%s: %w", _FunctionName, err)
+	}
+
+	return season, nil
+}
+
+/*
+********************************************************************
+Db_GetDestinationSeasonID
+*********************************************************************
+*/
+func (s *Storage) Db_GetDestinationSeasonID(
+	id int,
+	direction string,
+) (int, error) {
+	const _FunctionName = "storage.sqlite.Db_GetDestinationSeasonID"
+
+	/*
+		1. Получаем параметры текущего турнира.
+	*/
+	var (
+		idBase     int
+		season     string
+		seasonName string
+		leagueRank int
+	)
+
+	query := fmt.Sprintf(`
+		SELECT
+			%s,
+			%s,
+			%s,
+			IFNULL(%s, 0)
+		FROM %s
+		WHERE %s = ?
+	`,
+		storage.Fld_common_id_base,
+		storage.Fld_class_season_season,
+		storage.Fld_common_name,
+		storage.Fld_class_season_league_rank,
+		storage.Tbl_class_season,
+		storage.Fld_common_id,
+	)
+
+	err := s.db.QueryRow(query, id).Scan(
+		&idBase,
+		&season,
+		&seasonName,
+		&leagueRank,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
+
+		return 0, fmt.Errorf("%s: get current season: %w", _FunctionName, err)
+	}
+
+	/*
+		2. Ищем соседний сезон с тем же league_rank.
+	*/
+	var (
+		operator string
+		order    string
+	)
+
+	switch direction {
+	case "prev":
+		// Предыдущий сезон:
+		// 2006 -> 2005
+		operator = "<"
+		order = "DESC"
+	case "next":
+		// Следующий сезон:
+		// 2006 -> 2007
+		operator = ">"
+		order = "ASC"
+	default:
+		return 0, fmt.Errorf("%s: invalid direction %q", _FunctionName, direction)
+	}
+	var destSeason string
+
+	query = fmt.Sprintf(`
+		SELECT %s
+		FROM %s
+		WHERE %s = ?
+		  AND %s %s ?
+		  AND IFNULL(%s, 0) = ?
+		ORDER BY %s %s, %s %s
+		LIMIT 1
+	`,
+		storage.Fld_class_season_season,
+		storage.Tbl_class_season,
+
+		storage.Fld_common_id_base,
+
+		storage.Fld_class_season_season,
+		operator,
+
+		storage.Fld_class_season_league_rank,
+
+		storage.Fld_class_season_season,
+		order,
+
+		storage.Fld_common_sort_order,
+		order,
+	)
+
+	err = s.db.QueryRow(query, idBase, season, leagueRank).Scan(&destSeason)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil // Предыдущего/следующего сезона нет.
+		}
+
+		return 0, fmt.Errorf("%s: find destination season: %w", _FunctionName, err)
+	}
+
+	/*
+		3. Сначала пытаемся найти в найденном сезоне  турнир с тем же названием.
+		Это аналог:
+		q1.Filter := season = sDestSeason  AND league_rank = league_rank  AND name = season_name
+	*/
+	var destID int
+
+	query = fmt.Sprintf(`
+		SELECT %s
+		FROM %s
+		WHERE %s = ?
+		  AND IFNULL(%s, 0) = ?
+		  AND %s = ?
+		ORDER BY %s
+		LIMIT 1
+	`,
+		storage.Fld_common_id,
+		storage.Tbl_class_season,
+
+		storage.Fld_class_season_season,
+		storage.Fld_class_season_league_rank,
+		storage.Fld_common_name,
+
+		storage.Fld_common_sort_order,
+	)
+
+	err = s.db.QueryRow(query, destSeason, leagueRank, seasonName).Scan(&destID)
+	if err == nil {
+		return destID, nil
+	}
+
+	if err != sql.ErrNoRows {
+		return 0, fmt.Errorf("%s: find destination season by name: %w", _FunctionName, err)
+	}
+
+	/*
+		4. Турнира с таким же названием нет.
+
+		   Delphi тогда берёт первый турнир найденного   сезона с тем же league_rank.
+	*/
+	query = fmt.Sprintf(`
+		SELECT %s
+		FROM %s
+		WHERE %s = ?
+		  AND IFNULL(%s, 0) = ?
+		ORDER BY %s
+		LIMIT 1
+	`,
+		storage.Fld_common_id,
+		storage.Tbl_class_season,
+
+		storage.Fld_class_season_season,
+		storage.Fld_class_season_league_rank,
+
+		storage.Fld_common_sort_order,
+	)
+
+	err = s.db.QueryRow(query, destSeason, leagueRank).Scan(&destID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
+
+		return 0, fmt.Errorf("%s: find destination season fallback: %w", _FunctionName, err)
+	}
+
+	return destID, nil
+}
